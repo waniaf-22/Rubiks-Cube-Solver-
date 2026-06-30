@@ -745,3 +745,18 @@ footer {
   color: var(--white-50);
 }
 
+/* ── CNN ML METRICS CARD ── */
+.ml-metrics-card {
+  border-color: rgba(139, 92, 246, 0.2); /* purple themed ML card */
+}
+.ml-metrics-card .card-title {
+  color: #a78bfa; /* light purple */
+}
+#mlReport {
+  max-height: 160px;
+  overflow-y: auto;
+  scrollbar-width: thin;
+  scrollbar-color: var(--border) transparent;
+}
+
+

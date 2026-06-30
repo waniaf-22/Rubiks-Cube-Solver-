@@ -119,13 +119,23 @@ function handleTrackingResult(data, frameW, frameH) {
   ctx.clearRect(0, 0, canvas.width, canvas.height);
 
   // Update live status badges
-  document.getElementById('cvStatus').textContent = data.status;
+  const cvStatus = document.getElementById('cvStatus');
+  cvStatus.textContent = data.status;
+  if (data.status.includes("Rescan")) {
+    cvStatus.style.borderColor = "var(--red)";
+    cvStatus.style.color = "var(--red)";
+  } else {
+    cvStatus.style.borderColor = "var(--border-blue)";
+    cvStatus.style.color = "var(--blue-bright)";
+  }
+  
   document.getElementById('cvConf').textContent = `${data.confidence}%`;
   
   // Update live perspective warped preview image
   if (data.preview) {
     document.getElementById('liveWarped').src = data.preview;
   }
+
 
   const scaleX = canvas.width / frameW;
   const scaleY = canvas.height / frameH;

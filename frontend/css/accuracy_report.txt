@@ -1,0 +1,17 @@
+==================================================
+          STICKER CNN CLASSIFIER REPORT
+==================================================
+Date generated: 2026-06-30 14:29:39
+Validation Set Accuracy: 100.00%
+Total training size: 1320 images
+Total validation size: 300 images
+
+Precision and Recall details by class:
+--------------------------------------------------
+Class W: Precision: 100.0% | Recall: 100.0%
+Class Y: Precision: 100.0% | Recall: 100.0%
+Class B: Precision: 100.0% | Recall: 100.0%
+Class G: Precision: 100.0% | Recall: 100.0%
+Class O: Precision: 100.0% | Recall: 100.0%
+Class R: Precision: 100.0% | Recall: 100.0%
+==================================================

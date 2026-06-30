@@ -2,23 +2,39 @@
 color_detect.py
 ───────────────
 Advanced computer vision pipeline for Rubik's Cube scanning.
-Uses OpenCV, White Balance normalization, Adaptive Thresholding,
-Contour approximation, Perspective Warp, and HSV classification.
+Uses OpenCV edge contours, perspective warping, and a trained
+PyTorch CNN Classifier to recognize sticker colors with confidence levels.
 """
 
+import os
 import cv2
 import numpy as np
 import base64
+import torch
+from sticker_model import StickerCNN, CLASSES
 
-# Standard HSV References for classification
-# OpenCV HSV: H in [0, 180], S in [0, 255], V in [0, 255]
-HSV_REFS = {
-    "R": 0,    # Red (also near 180)
-    "O": 10,   # Orange
-    "Y": 25,   # Yellow
-    "G": 62,   # Green
-    "B": 112,  # Blue
-}
+# Load Model
+MODEL_PATH = os.path.join(os.path.dirname(os.path.abspath(__file__)), "sticker_cnn.pth")
+model = None
+
+def init_model():
+    global model
+    if model is not None:
+        return
+        
+    model = StickerCNN()
+    if not os.path.exists(MODEL_PATH):
+        print("[*] sticker_cnn.pth not found! Auto-triggering model training...")
+        from train_classifier import train_model
+        train_model()
+        
+    # Load weights
+    model.load_state_dict(torch.load(MODEL_PATH, map_location=torch.device('cpu')))
+    model.eval()
+    print("[*] StickerCNN PyTorch Model loaded successfully.")
+
+# Bootstrap model load on import
+init_model()
 
 def adjust_white_balance(img: np.ndarray) -> np.ndarray:
     """Apply Gray World white balance to mitigate lighting casts."""
@@ -35,30 +51,10 @@ def adjust_white_balance(img: np.ndarray) -> np.ndarray:
     r = np.clip(r * (avg / avg_r), 0, 255).astype(np.uint8)
     return cv2.merge([b, g, r])
 
-def classify_hsv(h: float, s: float, v: float) -> str:
-    """Classify a single sticker using HSV colour space."""
-    # White check: very low saturation, high value
-    if s < 60 and v > 110:
-        return "W"
-    
-    # Distance in Hue space (wrapping at 180)
-    best_key = "R"
-    best_dist = 999.0
-    
-    for key, ref_h in HSV_REFS.items():
-        # Hue is circular [0, 180]
-        dist = min(abs(h - ref_h), 180 - abs(h - ref_h))
-        if dist < best_dist:
-            best_dist = dist
-            best_key = key
-            
-    return best_key
-
 def detect_cube_face(img: np.ndarray) -> dict:
     """
-    Detects the cube face, waps it using perspective transform,
-    samples the 9 stickers in HSV space, and returns coordinates,
-    colors, sharpness, confidence, and user status feedback.
+    Detects the cube face, warps it using perspective transform,
+    runs sticker patches through StickerCNN, and returns metrics.
     """
     h_orig, w_orig = img.shape[:2]
     
@@ -97,7 +93,6 @@ def detect_cube_face(img: np.ndarray) -> dict:
         
         # We look for a convex 4-sided polygon (quadrilateral)
         if len(approx) == 4 and cv2.isContourConvex(approx):
-            # Check aspect ratio
             _, _, w_box, h_box = cv2.boundingRect(approx)
             aspect_ratio = float(w_box) / h_box
             if 0.75 <= aspect_ratio <= 1.35:
@@ -107,10 +102,10 @@ def detect_cube_face(img: np.ndarray) -> dict:
 
     warped = None
     boundaries = []
+    has_detection = False
     
     # 3. Perspective Warp if found, else fallback to center crop
     if best_poly is not None:
-        # Sort poly points: top-left, top-right, bottom-right, bottom-left
         pts = best_poly.reshape(4, 2)
         rect = np.zeros((4, 2), dtype="float32")
         
@@ -122,7 +117,6 @@ def detect_cube_face(img: np.ndarray) -> dict:
         rect[1] = pts[np.argmin(diff)]
         rect[3] = pts[np.argmax(diff)]
         
-        # Warp to a standard 270x270 square
         dst = np.array([
             [0, 0],
             [270 - 1, 0],
@@ -133,14 +127,11 @@ def detect_cube_face(img: np.ndarray) -> dict:
         M = cv2.getPerspectiveTransform(rect, dst)
         warped = cv2.warpPerspective(balanced, M, (270, 270))
         
-        # Calculate boundaries relative to original image coordinates for overlay
-        # We also scale coordinates to percentages (0-100) for frontend styling
         for pt in pts:
             boundaries.append([float(pt[0]), float(pt[1])])
             
         has_detection = True
     else:
-        # Fallback center crop (90x90 to 270x270 size)
         size = int(min(h_orig, w_orig) * 0.45)
         cx, cy = w_orig // 2, h_orig // 2
         x0, y0 = cx - size // 2, cy - size // 2
@@ -150,46 +141,58 @@ def detect_cube_face(img: np.ndarray) -> dict:
         else:
             warped = np.zeros((270, 270, 3), dtype=np.uint8)
         
-        # Boundaries represent the center box
         boundaries = [
             [float(x0), float(y0)],
             [float(x0 + size), float(y0)],
             [float(x0 + size), float(y0 + size)],
             [float(x0), float(y0 + size)]
         ]
-        has_detection = False
         
-    # 4. Segment and classify the 9 stickers
+    # 4. Segment and run predictions through StickerCNN model
     colors_list = []
-    hsv_warped = cv2.cvtColor(warped, cv2.COLOR_BGR2HSV)
+    confidences = []
     
-    # We will sample 30x30 patches at the center of each of the 3x3 grids (size 90x90)
     for row in range(3):
         for col in range(3):
-            # Center of the 90x90 cell
             cx_cell = col * 90 + 45
             cy_cell = row * 90 + 45
             
-            # Extract 30x30 patch
-            patch = hsv_warped[cy_cell-15:cy_cell+15, cx_cell-15:cx_cell+15]
-            avg_hsv = patch.mean(axis=(0, 1))
+            # Crop 40x40 patch to capture enough colors
+            patch = warped[cy_cell-20:cy_cell+20, cx_cell-20:cx_cell+20]
+            resized = cv2.resize(patch, (32, 32))
             
-            col_key = classify_hsv(avg_hsv[0], avg_hsv[1], avg_hsv[2])
-            colors_list.append(col_key)
+            # Preprocess: float32, scaling to [0,1], convert BGR to RGB, transpose to (C, H, W)
+            tensor_img = resized.astype(np.float32) / 255.0
+            tensor_img = cv2.cvtColor(tensor_img, cv2.COLOR_BGR2RGB)
+            tensor_img = np.transpose(tensor_img, (2, 0, 1))
+            
+            # Convert to PyTorch FloatTensor and add batch dimension
+            torch_img = torch.tensor(tensor_img, dtype=torch.float32).unsqueeze(0)
+            
+            # Forward pass
+            with torch.no_grad():
+                outputs = model(torch_img)
+                probs = torch.softmax(outputs, dim=1)
+                val, idx = torch.max(probs, dim=1)
+                
+            colors_list.append(CLASSES[idx.item()])
+            confidences.append(val.item() * 100.0)
 
-    # 5. Compute confidence and user feedback status
-    confidence = 98 if has_detection else 60
-    if is_blurry:
-        confidence -= 20
-        
+    # 5. Compute overall confidence and status
+    avg_confidence = int(np.mean(confidences))
     if not has_detection:
+        avg_confidence = min(60, avg_confidence)
         status_msg = "Move Closer" if max_area == 0 else "Rotate Cube"
     elif is_blurry:
+        avg_confidence = min(75, avg_confidence)
         status_msg = "Scanning... Hold Still"
+    elif avg_confidence < 90:
+        # If classification confidence is below 90%, prompt to rescan
+        status_msg = "Rescan (Low Confidence)"
     else:
         status_msg = "Good Lighting"
         
-    # Draw tracking boxes on the warped image for a cool visual feedback
+    # Draw tracking boxes on the warped image for visual feedback
     feedback_img = warped.copy()
     for row in range(3):
         for col in range(3):
@@ -201,7 +204,6 @@ def detect_cube_face(img: np.ndarray) -> dict:
                 cv2.FONT_HERSHEY_SIMPLEX, 0.7, (255, 255, 255), 2
             )
             
-    # Encode feedback image to base64
     _, encoded = cv2.imencode('.jpg', feedback_img)
     preview_b64 = "data:image/jpeg;base64," + base64.b64encode(encoded).decode('utf-8')
     
@@ -209,7 +211,7 @@ def detect_cube_face(img: np.ndarray) -> dict:
         "detected": has_detection,
         "colors": colors_list,
         "boundaries": boundaries,
-        "confidence": max(10, min(100, confidence)),
+        "confidence": avg_confidence,
         "status": status_msg,
         "sharpness": round(sharpness, 1),
         "preview": preview_b64

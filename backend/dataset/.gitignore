@@ -1,0 +1,4 @@
+# Ignore raw image dataset files
+*.png
+*.jpg
+*.jpeg

@@ -244,6 +244,21 @@ export function changeSolver() {
   state.solverMethod = document.getElementById('selSolver').value;
 }
 
+export async function loadMLReport() {
+  try {
+    const res = await fetch('/css/accuracy_report.txt');
+    if (res.ok) {
+      const text = await res.text();
+      const el = document.getElementById('mlReport');
+      if (el) el.textContent = text;
+    }
+    const img = document.getElementById('mlCM');
+    if (img) img.src = `/css/confusion_matrix.png?t=${Date.now()}`;
+  } catch(err) {
+    console.error("Error loading ML report:", err);
+  }
+}
+
 /* ── Expose globals for HTML onclick handlers ────────────────────────────── */
 
 window.__startCam          = startCam;
@@ -255,6 +270,7 @@ window.__saveManual        = saveManual;
 window.__nextStep          = nextStep;
 window.__prevStep          = prevStep;
 window.__changeSolver      = changeSolver;
+window.__loadMLReport      = loadMLReport;
 
 /* ── Bootstrap ───────────────────────────────────────────────────────────── */
 
@@ -266,4 +282,6 @@ document.addEventListener('DOMContentLoaded', () => {
   buildPaintGrid();
   buildMethodPills();
   renderLearn();
+  loadMLReport();
 });
+
