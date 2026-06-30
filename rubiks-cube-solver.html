@@ -1,0 +1,1163 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>CubeSolve — AI Powered Rubik's Cube Solver</title>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&family=Space+Grotesk:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>
+*, *::before, *::after { margin: 0; padding: 0; box-sizing: border-box; }
+
+:root {
+  --bg: #0C0C0F;
+  --bg1: #111116;
+  --bg2: #16161D;
+  --bg3: #1C1C26;
+  --blue: #4F8EF7;
+  --blue-bright: #6BA3FF;
+  --blue-dim: #2D5FC4;
+  --blue-glow: rgba(79,142,247,0.18);
+  --white: #FFFFFF;
+  --white-80: rgba(255,255,255,0.8);
+  --white-50: rgba(255,255,255,0.5);
+  --white-25: rgba(255,255,255,0.25);
+  --white-10: rgba(255,255,255,0.1);
+  --white-05: rgba(255,255,255,0.05);
+  --border: rgba(255,255,255,0.08);
+  --border-blue: rgba(79,142,247,0.3);
+  --green: #34D399;
+  --red: #F87171;
+  --yellow: #FBBF24;
+  --orange: #FB923C;
+  --radius: 14px;
+  --radius-sm: 8px;
+}
+
+html { scroll-behavior: smooth; scroll-snap-type: y mandatory; }
+body { background: var(--bg); color: var(--white); font-family: 'Inter', sans-serif; overflow-x: hidden; }
+
+/* ── SCROLLSNAP SECTIONS ── */
+section {
+  min-height: 100vh;
+  scroll-snap-align: start;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  position: relative;
+  overflow: hidden;
+}
+
+/* ── NAV ── */
+nav {
+  position: fixed; top: 0; left: 0; right: 0; z-index: 200;
+  padding: 0 3rem;
+  height: 64px;
+  display: flex; align-items: center; justify-content: space-between;
+  background: rgba(12,12,15,0.7);
+  backdrop-filter: blur(24px);
+  border-bottom: 1px solid var(--border);
+}
+.nav-logo {
+  font-family: 'Space Grotesk', sans-serif;
+  font-weight: 700; font-size: 1.15rem; letter-spacing: -0.3px;
+  color: var(--white);
+  display: flex; align-items: center; gap: 8px;
+}
+.nav-logo-dot {
+  width: 8px; height: 8px; border-radius: 50%;
+  background: var(--blue);
+  box-shadow: 0 0 12px var(--blue);
+}
+.nav-links { display: flex; gap: 0.25rem; }
+.nav-link {
+  padding: 0.4rem 0.875rem; border-radius: 8px;
+  font-size: 0.85rem; font-weight: 500; color: var(--white-50);
+  cursor: pointer; transition: all 0.15s; border: none; background: none;
+  font-family: 'Inter', sans-serif;
+}
+.nav-link:hover { color: var(--white); background: var(--white-05); }
+.nav-cta {
+  padding: 0.45rem 1.1rem; border-radius: 8px;
+  font-size: 0.85rem; font-weight: 600; color: var(--white);
+  background: var(--blue); border: none; cursor: pointer;
+  font-family: 'Inter', sans-serif; transition: all 0.15s;
+}
+.nav-cta:hover { background: var(--blue-bright); }
+
+/* ── NOISE + GRID OVERLAY ── */
+.grid-bg {
+  position: absolute; inset: 0; pointer-events: none;
+  background-image:
+    linear-gradient(rgba(79,142,247,0.03) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(79,142,247,0.03) 1px, transparent 1px);
+  background-size: 64px 64px;
+}
+.radial-glow {
+  position: absolute; pointer-events: none; border-radius: 50%;
+  background: radial-gradient(circle, var(--blue-glow), transparent 70%);
+}
+
+/* ── SECTION 1: HERO ── */
+#hero { padding: 64px 0 0; align-items: center; }
+.hero-inner {
+  max-width: 1160px; width: 100%; margin: 0 auto;
+  padding: 0 3rem;
+  display: grid; grid-template-columns: 1fr 460px; gap: 5rem; align-items: center;
+}
+.hero-eyebrow {
+  display: inline-flex; align-items: center; gap: 8px;
+  padding: 5px 14px; border-radius: 100px;
+  border: 1px solid var(--border-blue);
+  background: var(--blue-glow);
+  font-size: 0.75rem; font-weight: 600;
+  color: var(--blue-bright); letter-spacing: 0.5px;
+  text-transform: uppercase; margin-bottom: 1.75rem;
+}
+.eyebrow-pulse {
+  width: 6px; height: 6px; border-radius: 50%;
+  background: var(--blue); animation: blink 1.5s ease-in-out infinite;
+}
+@keyframes blink { 0%,100%{opacity:1} 50%{opacity:0.2} }
+.hero-h1 {
+  font-family: 'Space Grotesk', sans-serif;
+  font-size: clamp(2.8rem, 5vw, 4.2rem);
+  font-weight: 700; line-height: 1.08; letter-spacing: -1.5px;
+  margin-bottom: 1.5rem;
+}
+.hero-h1 em { font-style: normal; color: var(--blue-bright); }
+.hero-sub {
+  font-size: 1.05rem; line-height: 1.75;
+  color: var(--white-50); margin-bottom: 2.25rem; max-width: 480px;
+}
+.hero-actions { display: flex; gap: 0.75rem; align-items: center; flex-wrap: wrap; }
+.btn-primary {
+  padding: 0.75rem 1.75rem; border-radius: 10px;
+  font-size: 0.95rem; font-weight: 600; color: var(--white);
+  background: var(--blue); border: none; cursor: pointer;
+  font-family: 'Inter', sans-serif; transition: all 0.2s;
+  box-shadow: 0 0 0 0 var(--blue-glow);
+}
+.btn-primary:hover { background: var(--blue-bright); transform: translateY(-1px); box-shadow: 0 8px 30px rgba(79,142,247,0.35); }
+.btn-ghost {
+  padding: 0.75rem 1.5rem; border-radius: 10px;
+  font-size: 0.95rem; font-weight: 500; color: var(--white-80);
+  background: var(--white-05); border: 1px solid var(--border);
+  cursor: pointer; font-family: 'Inter', sans-serif; transition: all 0.2s;
+}
+.btn-ghost:hover { background: var(--white-10); border-color: var(--white-25); color: var(--white); }
+.hero-stats {
+  display: flex; gap: 2.5rem; margin-top: 3rem;
+  padding-top: 2.5rem; border-top: 1px solid var(--border);
+}
+.hero-stat-num {
+  font-family: 'Space Grotesk', sans-serif;
+  font-size: 1.6rem; font-weight: 700; color: var(--white); line-height: 1;
+}
+.hero-stat-label { font-size: 0.78rem; color: var(--white-50); margin-top: 4px; }
+
+/* ── 3D CSS CUBE ── */
+.cube-wrapper {
+  display: flex; align-items: center; justify-content: center;
+  height: 420px; position: relative;
+}
+.cube-scene {
+  width: 220px; height: 220px;
+  perspective: 700px; cursor: grab;
+}
+.cube-scene:active { cursor: grabbing; }
+.cube-3d {
+  width: 100%; height: 100%;
+  transform-style: preserve-3d;
+  transform: rotateX(-22deg) rotateY(35deg);
+}
+.cube-3d.floating { animation: floatRotate 9s ease-in-out infinite; }
+@keyframes floatRotate {
+  0%,100% { transform: rotateX(-22deg) rotateY(35deg) translateY(0); }
+  50% { transform: rotateX(-28deg) rotateY(55deg) translateY(-16px); }
+}
+.cface {
+  position: absolute; width: 220px; height: 220px;
+  display: grid; grid-template-columns: repeat(3,1fr); gap: 4px; padding: 6px;
+  background: #0a0a0f; border-radius: 8px;
+}
+.cface.f-front  { transform: translateZ(110px); }
+.cface.f-back   { transform: rotateY(180deg) translateZ(110px); }
+.cface.f-left   { transform: rotateY(-90deg) translateZ(110px); }
+.cface.f-right  { transform: rotateY(90deg) translateZ(110px); }
+.cface.f-top    { transform: rotateX(90deg) translateZ(110px); }
+.cface.f-bottom { transform: rotateX(-90deg) translateZ(110px); }
+.csticker { border-radius: 4px; transition: background 0.4s; }
+
+/* ── SECTION 2: SOLVER ── */
+#solver { padding: 64px 0 0; align-items: stretch; justify-content: flex-start; }
+.solver-inner {
+  max-width: 1160px; width: 100%; margin: 0 auto;
+  padding: 3rem 3rem 3rem;
+  display: flex; flex-direction: column; gap: 2rem;
+  flex: 1;
+}
+.solver-top {
+  display: flex; align-items: flex-end; justify-content: space-between; gap: 1rem;
+}
+.section-label {
+  font-size: 0.7rem; font-weight: 700; letter-spacing: 2px;
+  text-transform: uppercase; color: var(--blue); margin-bottom: 0.5rem;
+}
+.section-title {
+  font-family: 'Space Grotesk', sans-serif;
+  font-size: clamp(1.8rem, 3vw, 2.4rem);
+  font-weight: 700; letter-spacing: -0.5px; color: var(--white);
+}
+.solver-layout {
+  display: grid; grid-template-columns: 1fr 340px; gap: 1.5rem; flex: 1;
+}
+
+/* ── CAMERA CARD ── */
+.card {
+  background: var(--bg1);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  overflow: hidden;
+}
+.card-header {
+  padding: 1rem 1.25rem;
+  border-bottom: 1px solid var(--border);
+  display: flex; align-items: center; justify-content: space-between;
+}
+.card-title {
+  font-size: 0.875rem; font-weight: 600; color: var(--white);
+  display: flex; align-items: center; gap: 8px;
+}
+.status-pill {
+  display: flex; align-items: center; gap: 6px;
+  padding: 3px 10px; border-radius: 100px;
+  font-size: 0.7rem; font-weight: 600;
+  background: rgba(248,113,113,0.1); border: 1px solid rgba(248,113,113,0.2); color: var(--red);
+}
+.status-pill.on { background: rgba(52,211,153,0.1); border-color: rgba(52,211,153,0.2); color: var(--green); }
+.status-dot { width: 6px; height: 6px; border-radius: 50%; background: currentColor; }
+.status-dot.blink { animation: blink 1.5s infinite; }
+
+.cam-body {
+  position: relative; aspect-ratio: 16/9;
+  background: var(--bg);
+}
+video { width: 100%; height: 100%; object-fit: cover; display: block; }
+.cam-empty {
+  position: absolute; inset: 0;
+  display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 1rem;
+}
+.cam-empty-icon {
+  width: 64px; height: 64px; border-radius: 14px;
+  background: var(--white-05); border: 1px solid var(--border);
+  display: flex; align-items: center; justify-content: center;
+  font-size: 1.75rem;
+}
+.cam-empty p { font-size: 0.85rem; color: var(--white-50); text-align: center; max-width: 220px; line-height: 1.5; }
+
+/* scan overlay */
+.scan-overlay { position: absolute; inset: 0; pointer-events: none; display: none; }
+.scan-corner { position: absolute; width: 32px; height: 32px; border-color: var(--blue); border-style: solid; opacity: 0.9; }
+.scan-corner.tl { top:14px; left:14px; border-width:2px 0 0 2px; border-radius:3px 0 0 0; }
+.scan-corner.tr { top:14px; right:14px; border-width:2px 2px 0 0; border-radius:0 3px 0 0; }
+.scan-corner.bl { bottom:14px; left:14px; border-width:0 0 2px 2px; border-radius:0 0 0 3px; }
+.scan-corner.br { bottom:14px; right:14px; border-width:0 2px 2px 0; border-radius:0 0 3px 0; }
+.scan-reticle {
+  position: absolute; top:50%; left:50%;
+  transform: translate(-50%,-50%);
+  width: 42%; aspect-ratio: 1;
+  border: 1.5px dashed rgba(79,142,247,0.5); border-radius: 4px;
+}
+.scan-reticle-label {
+  position: absolute; bottom: -24px; left: 50%; transform: translateX(-50%);
+  font-size: 0.65rem; color: var(--blue); white-space: nowrap; letter-spacing: 1px; font-weight: 600;
+}
+.scan-sweep {
+  position: absolute; left: 8%; right: 8%; height: 1.5px;
+  background: linear-gradient(90deg, transparent, var(--blue), transparent);
+  animation: sweep 2.5s ease-in-out infinite;
+}
+@keyframes sweep { 0%{top:12%;opacity:0} 10%{opacity:1} 90%{opacity:1} 100%{top:88%;opacity:0} }
+
+.cam-footer {
+  padding: 0.875rem 1.25rem;
+  display: flex; align-items: center; gap: 0.625rem;
+  border-top: 1px solid var(--border);
+}
+.ibtn {
+  padding: 0.45rem 1rem; border-radius: 8px;
+  font-size: 0.8rem; font-weight: 600; cursor: pointer;
+  border: none; font-family: 'Inter', sans-serif; transition: all 0.15s;
+}
+.ibtn-blue { background: var(--blue); color: #fff; }
+.ibtn-blue:hover { background: var(--blue-bright); }
+.ibtn-ghost { background: var(--white-05); color: var(--white-80); border: 1px solid var(--border); }
+.ibtn-ghost:hover { background: var(--white-10); color: var(--white); }
+.ibtn:disabled { opacity: 0.35; cursor: not-allowed; }
+.cam-hint { margin-left: auto; font-size: 0.75rem; color: var(--white-50); font-style: italic; }
+
+/* face tabs */
+.face-tabs-row {
+  padding: 0.875rem 1.25rem;
+  border-top: 1px solid var(--border);
+  display: flex; flex-direction: column; gap: 0.5rem;
+}
+.face-tabs-label { font-size: 0.68rem; font-weight: 700; letter-spacing: 1.5px; text-transform: uppercase; color: var(--white-25); }
+.face-tabs { display: flex; gap: 0.4rem; flex-wrap: wrap; }
+.ftab {
+  padding: 0.3rem 0.7rem; border-radius: 6px;
+  font-size: 0.72rem; font-weight: 600; cursor: pointer;
+  background: var(--white-05); color: var(--white-50);
+  border: 1px solid var(--border); font-family: 'Inter', sans-serif;
+  transition: all 0.15s;
+}
+.ftab:hover { color: var(--white); border-color: var(--white-25); }
+.ftab.active { background: rgba(79,142,247,0.12); border-color: var(--border-blue); color: var(--blue-bright); }
+.ftab.done { background: rgba(52,211,153,0.08); border-color: rgba(52,211,153,0.25); color: var(--green); }
+
+/* manual paint */
+.paint-row {
+  padding: 1rem 1.25rem; border-top: 1px solid var(--border);
+  display: flex; align-items: flex-start; gap: 1.5rem; flex-wrap: wrap;
+}
+.paint-label { font-size: 0.68rem; font-weight: 700; letter-spacing: 1.5px; text-transform: uppercase; color: var(--white-25); margin-bottom: 0.5rem; }
+.color-swatches { display: flex; gap: 6px; flex-wrap: wrap; }
+.swatch {
+  width: 26px; height: 26px; border-radius: 6px; cursor: pointer;
+  border: 2px solid transparent; transition: all 0.15s; flex-shrink: 0;
+}
+.swatch.sel { border-color: var(--white); transform: scale(1.2); }
+.paint-grid {
+  display: grid; grid-template-columns: repeat(3,1fr); gap: 3px;
+  width: 90px; height: 90px;
+}
+.paint-cell { border-radius: 3px; cursor: pointer; transition: transform 0.1s; background: #1e1e2a; }
+.paint-cell:hover { transform: scale(1.08); z-index: 2; }
+
+/* ── SIDEBAR ── */
+.sidebar { display: flex; flex-direction: column; gap: 1rem; }
+
+/* cube net */
+.cube-net-card { padding: 1.125rem; }
+.cube-net-header {
+  display: flex; align-items: center; justify-content: space-between; margin-bottom: 1rem;
+}
+.cube-net-title { font-size: 0.875rem; font-weight: 600; color: var(--white); }
+.ibtn-xs { padding: 0.25rem 0.625rem; font-size: 0.72rem; }
+.net-grid {
+  display: grid;
+  grid-template-columns: repeat(4, 62px);
+  grid-template-rows: repeat(3, 62px);
+  gap: 3px; margin: 0 auto; width: fit-content;
+}
+.net-slot { width: 62px; height: 62px; }
+.net-slot.empty { background: transparent; }
+.net-face-label {
+  font-size: 0.58rem; font-weight: 700; letter-spacing: 1px;
+  text-transform: uppercase; text-align: center; margin-bottom: 2px;
+}
+.net-stickers {
+  display: grid; grid-template-columns: repeat(3,1fr); gap: 2px;
+  width: 62px; height: 55px;
+}
+.net-s { border-radius: 2px; }
+
+/* solution card */
+.solution-card { padding: 1.125rem; display: flex; flex-direction: column; gap: 1rem; }
+.progress-wrap { display: flex; flex-direction: column; gap: 0.5rem; }
+.progress-row { display: flex; justify-content: space-between; align-items: center; }
+.progress-text { font-size: 0.78rem; color: var(--white-50); }
+.progress-pct { font-size: 0.78rem; font-weight: 700; color: var(--blue-bright); font-family: 'Space Grotesk', sans-serif; }
+.progress-track { height: 4px; background: var(--white-05); border-radius: 2px; overflow: hidden; }
+.progress-bar { height: 100%; background: var(--blue); border-radius: 2px; transition: width 0.4s ease; }
+.step-nav { display: flex; gap: 0.5rem; }
+.step-nav .ibtn { flex: 1; justify-content: center; }
+.sol-steps { display: flex; flex-direction: column; gap: 3px; max-height: 260px; overflow-y: auto; padding-right: 2px; }
+.sol-steps::-webkit-scrollbar { width: 3px; }
+.sol-steps::-webkit-scrollbar-thumb { background: var(--blue-dim); border-radius: 2px; }
+.phase-divider {
+  font-size: 0.65rem; font-weight: 700; letter-spacing: 1.5px; text-transform: uppercase;
+  color: var(--blue); padding: 0.5rem 0 0.2rem; border-top: 1px solid var(--border); margin-top: 0.25rem;
+}
+.phase-divider:first-child { border-top: none; margin-top: 0; }
+.sol-step {
+  display: flex; align-items: center; gap: 0.625rem;
+  padding: 0.5rem 0.75rem; border-radius: 8px;
+  border: 1px solid transparent;
+  background: transparent; cursor: pointer; transition: all 0.15s; text-align: left; width: 100%;
+  font-family: 'Inter', sans-serif;
+}
+.sol-step:hover { background: var(--white-05); border-color: var(--border); }
+.sol-step.current { background: rgba(79,142,247,0.1); border-color: var(--border-blue); }
+.sol-step.done { opacity: 0.5; }
+.sol-step-num {
+  width: 20px; height: 20px; border-radius: 50%; flex-shrink: 0;
+  display: flex; align-items: center; justify-content: center;
+  font-size: 0.65rem; font-weight: 700; font-family: 'Space Grotesk', sans-serif;
+}
+.num-pending { background: var(--white-05); color: var(--white-50); }
+.num-current { background: var(--blue); color: #fff; }
+.num-done { background: rgba(52,211,153,0.15); color: var(--green); }
+.sol-move { font-size: 0.9rem; font-weight: 700; color: var(--white); min-width: 28px; font-family: 'Space Grotesk', sans-serif; }
+.sol-desc { font-size: 0.72rem; color: var(--white-50); line-height: 1.35; }
+.sol-check { margin-left: auto; font-size: 0.7rem; color: var(--green); display: none; }
+.sol-step.done .sol-check { display: block; }
+
+/* alert strip */
+.alert-strip {
+  display: none; align-items: center; gap: 8px;
+  padding: 0.6rem 1rem; font-size: 0.78rem; font-weight: 500;
+  border-radius: 8px; margin: 0 1.25rem 0.875rem;
+}
+.alert-strip.show { display: flex; }
+.alert-success { background: rgba(52,211,153,0.08); border: 1px solid rgba(52,211,153,0.2); color: var(--green); }
+.alert-info { background: rgba(79,142,247,0.08); border: 1px solid var(--border-blue); color: var(--blue-bright); }
+.alert-warn { background: rgba(251,191,36,0.08); border: 1px solid rgba(251,191,36,0.2); color: var(--yellow); }
+
+/* move flash */
+#moveFlash {
+  position: fixed; top: 50%; left: 50%;
+  transform: translate(-50%,-50%) scale(0.85);
+  opacity: 0; pointer-events: none;
+  background: var(--bg2); border: 1px solid var(--border-blue);
+  border-radius: 20px; padding: 2rem 3.5rem;
+  text-align: center; z-index: 500; transition: all 0.25s;
+}
+#moveFlash.show { opacity: 1; transform: translate(-50%,-50%) scale(1); }
+#moveFlash .flash-move { font-family: 'Space Grotesk',sans-serif; font-size: 3rem; font-weight: 700; color: var(--blue-bright); }
+#moveFlash .flash-desc { font-size: 0.85rem; color: var(--white-50); margin-top: 0.4rem; }
+
+/* ── SECTION 3: LEARN ── */
+#learn { padding: 64px 0 0; justify-content: flex-start; }
+.learn-inner {
+  max-width: 1160px; width: 100%; margin: 0 auto;
+  padding: 3rem 3rem; display: flex; flex-direction: column; gap: 2rem; flex: 1;
+}
+.method-pills { display: flex; gap: 0.375rem; flex-wrap: wrap; }
+.mpill {
+  padding: 0.425rem 1.1rem; border-radius: 100px;
+  font-size: 0.8rem; font-weight: 600; cursor: pointer;
+  background: var(--white-05); color: var(--white-50);
+  border: 1px solid var(--border); font-family: 'Inter', sans-serif; transition: all 0.15s;
+}
+.mpill:hover { color: var(--white); border-color: var(--white-25); }
+.mpill.active { background: rgba(79,142,247,0.12); border-color: var(--border-blue); color: var(--blue-bright); }
+.learn-body { display: grid; grid-template-columns: 260px 1fr; gap: 1.5rem; flex: 1; }
+.steps-nav { display: flex; flex-direction: column; gap: 4px; }
+.lstep {
+  display: flex; align-items: center; gap: 12px;
+  padding: 0.75rem 1rem; border-radius: 10px;
+  cursor: pointer; border: 1px solid transparent;
+  background: transparent; text-align: left; width: 100%;
+  font-family: 'Inter', sans-serif; transition: all 0.15s;
+}
+.lstep:hover { background: var(--white-05); }
+.lstep.active { background: rgba(79,142,247,0.1); border-color: var(--border-blue); }
+.lstep-num {
+  width: 32px; height: 32px; border-radius: 8px; flex-shrink: 0;
+  display: flex; align-items: center; justify-content: center;
+  font-size: 0.75rem; font-weight: 700; font-family: 'Space Grotesk', sans-serif;
+  background: var(--white-05); color: var(--white-50);
+}
+.lstep.active .lstep-num { background: var(--blue); color: #fff; }
+.lstep-title { font-size: 0.875rem; font-weight: 600; color: var(--white-80); line-height: 1.2; }
+.lstep-sub { font-size: 0.72rem; color: var(--white-50); margin-top: 1px; }
+.learn-content-card {
+  background: var(--bg1); border: 1px solid var(--border);
+  border-radius: var(--radius); padding: 2rem; overflow-y: auto; max-height: calc(100vh - 200px);
+}
+.lc-phase {
+  display: inline-block; padding: 3px 12px; border-radius: 100px;
+  font-size: 0.68rem; font-weight: 700; letter-spacing: 1px; text-transform: uppercase;
+  background: rgba(79,142,247,0.12); border: 1px solid var(--border-blue); color: var(--blue-bright);
+  margin-bottom: 1rem;
+}
+.lc-h2 {
+  font-family: 'Space Grotesk', sans-serif;
+  font-size: 1.5rem; font-weight: 700; letter-spacing: -0.3px;
+  color: var(--white); margin-bottom: 1rem;
+}
+.lc-p { font-size: 0.9rem; line-height: 1.75; color: var(--white-50); margin-bottom: 0.875rem; }
+.alg-block {
+  background: var(--bg); border: 1px solid var(--border);
+  border-radius: 10px; padding: 0.875rem 1.125rem; margin-bottom: 0.75rem;
+}
+.alg-block-label { font-size: 0.65rem; font-weight: 700; letter-spacing: 1.5px; text-transform: uppercase; color: var(--white-25); margin-bottom: 5px; }
+.alg-block-code { font-family: 'Space Grotesk', sans-serif; font-size: 1.05rem; font-weight: 700; color: var(--blue-bright); letter-spacing: 2px; }
+.tip-strip {
+  display: flex; gap: 10px; align-items: flex-start;
+  background: rgba(251,191,36,0.06); border: 1px solid rgba(251,191,36,0.15);
+  border-radius: 10px; padding: 0.875rem 1rem; margin-top: 0.875rem;
+}
+.tip-strip-icon { font-size: 1.1rem; flex-shrink: 0; margin-top: 1px; }
+.tip-strip-text { font-size: 0.83rem; line-height: 1.6; color: var(--white-50); }
+.notation-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(96px,1fr)); gap: 0.625rem; margin-top: 1rem; }
+.notation-card {
+  background: var(--bg); border: 1px solid var(--border);
+  border-radius: 8px; padding: 0.75rem; text-align: center;
+}
+.notation-card .nm { font-family: 'Space Grotesk',sans-serif; font-size: 1.1rem; font-weight: 700; color: var(--blue-bright); }
+.notation-card .nn { font-size: 0.65rem; color: var(--white-50); margin-top: 3px; }
+.notation-card .nd { font-size: 0.6rem; color: var(--white-25); margin-top: 1px; }
+.lc-nav { display: flex; gap: 0.75rem; margin-top: 1.75rem; padding-top: 1.5rem; border-top: 1px solid var(--border); }
+
+/* ── SECTION 4: TIPS ── */
+#tips { padding: 64px 0 0; justify-content: flex-start; }
+.tips-inner {
+  max-width: 1160px; width: 100%; margin: 0 auto;
+  padding: 3rem 3rem; display: flex; flex-direction: column; gap: 2.5rem;
+}
+.tips-grid { display: grid; grid-template-columns: repeat(3,1fr); gap: 1.25rem; }
+.tip-card {
+  background: var(--bg1); border: 1px solid var(--border);
+  border-radius: var(--radius); padding: 1.5rem;
+  transition: all 0.2s;
+}
+.tip-card:hover { border-color: var(--border-blue); transform: translateY(-3px); }
+.tip-card-tag {
+  display: inline-flex; align-items: center; gap: 6px;
+  padding: 3px 10px; border-radius: 100px;
+  font-size: 0.65rem; font-weight: 700; letter-spacing: 1px; text-transform: uppercase;
+  background: rgba(79,142,247,0.08); border: 1px solid var(--border-blue); color: var(--blue);
+  margin-bottom: 1rem;
+}
+.tip-card h4 { font-family: 'Space Grotesk', sans-serif; font-size: 1rem; font-weight: 700; color: var(--white); margin-bottom: 0.5rem; letter-spacing: -0.2px; }
+.tip-card p { font-size: 0.83rem; line-height: 1.7; color: var(--white-50); }
+
+/* stats row */
+.stats-row { display: grid; grid-template-columns: repeat(4,1fr); gap: 1.25rem; }
+.stat-box {
+  background: var(--bg1); border: 1px solid var(--border);
+  border-radius: var(--radius); padding: 1.5rem; text-align: center;
+}
+.stat-box-num {
+  font-family: 'Space Grotesk', sans-serif;
+  font-size: 2.2rem; font-weight: 700; color: var(--blue-bright); line-height: 1;
+}
+.stat-box-label { font-size: 0.78rem; color: var(--white-50); margin-top: 6px; }
+
+/* footer */
+footer {
+  scroll-snap-align: start;
+  padding: 3rem 3rem;
+  border-top: 1px solid var(--border);
+  display: flex; align-items: center; justify-content: space-between;
+  background: var(--bg); flex-wrap: wrap; gap: 1rem;
+}
+.footer-logo { font-family: 'Space Grotesk', sans-serif; font-size: 1rem; font-weight: 700; color: var(--white-50); }
+.footer-copy { font-size: 0.78rem; color: var(--white-25); }
+
+/* responsive */
+@media(max-width:900px){
+  .hero-inner { grid-template-columns:1fr; }
+  .cube-wrapper { height:280px; }
+  .solver-layout { grid-template-columns:1fr; }
+  .learn-body { grid-template-columns:1fr; }
+  .tips-grid { grid-template-columns:repeat(2,1fr); }
+  .stats-row { grid-template-columns:repeat(2,1fr); }
+  nav { padding:0 1.25rem; }
+  .hero-inner,.solver-inner,.learn-inner,.tips-inner { padding-left:1.25rem; padding-right:1.25rem; }
+  footer { padding:2rem 1.25rem; }
+}
+@media(max-width:560px){
+  .tips-grid { grid-template-columns:1fr; }
+  .hero-stats { gap:1.5rem; }
+  .net-grid { grid-template-columns:repeat(4,52px); grid-template-rows:repeat(3,52px); }
+}
+</style>
+</head>
+<body>
+
+<!-- NAV -->
+<nav>
+  <div class="nav-logo">
+    <div class="nav-logo-dot"></div>
+    CubeSolve
+  </div>
+  <div class="nav-links">
+    <button class="nav-link" onclick="document.getElementById('hero').scrollIntoView({behavior:'smooth'})">Home</button>
+    <button class="nav-link" onclick="document.getElementById('solver').scrollIntoView({behavior:'smooth'})">Solver</button>
+    <button class="nav-link" onclick="document.getElementById('learn').scrollIntoView({behavior:'smooth'})">Learn</button>
+    <button class="nav-link" onclick="document.getElementById('tips').scrollIntoView({behavior:'smooth'})">Tips</button>
+  </div>
+  <button class="nav-cta" onclick="document.getElementById('solver').scrollIntoView({behavior:'smooth'})">Open Solver →</button>
+</nav>
+
+<!-- MOVE FLASH -->
+<div id="moveFlash">
+  <div class="flash-move" id="flashMove"></div>
+  <div class="flash-desc" id="flashDesc"></div>
+</div>
+
+<!-- ═══════════════════════════════ SECTION 1: HERO ═══════════════════════════════ -->
+<section id="hero">
+  <div class="grid-bg"></div>
+  <div class="radial-glow" style="width:700px;height:700px;top:-200px;right:-100px;opacity:0.5"></div>
+  <div class="hero-inner">
+    <div>
+      <div class="hero-eyebrow">
+        <div class="eyebrow-pulse"></div>
+        AI · Camera Vision · Step-by-Step
+      </div>
+      <h1 class="hero-h1">
+        Solve any<br>Rubik's Cube<br><em>in seconds.</em>
+      </h1>
+      <p class="hero-sub">Point your camera at each face of your cube. Our AI reads the colors and generates the fastest path to solved — move by move, in real time.</p>
+      <div class="hero-actions">
+        <button class="btn-primary" onclick="document.getElementById('solver').scrollIntoView({behavior:'smooth'})">Start Solving →</button>
+        <button class="btn-ghost" onclick="document.getElementById('learn').scrollIntoView({behavior:'smooth'})">Learn to Solve</button>
+      </div>
+      <div class="hero-stats">
+        <div>
+          <div class="hero-stat-num">43Q</div>
+          <div class="hero-stat-label">Possible combos</div>
+        </div>
+        <div>
+          <div class="hero-stat-num">20</div>
+          <div class="hero-stat-label">Max moves needed</div>
+        </div>
+        <div>
+          <div class="hero-stat-num">3.47s</div>
+          <div class="hero-stat-label">World record</div>
+        </div>
+        <div>
+          <div class="hero-stat-num">Free</div>
+          <div class="hero-stat-label">No login needed</div>
+        </div>
+      </div>
+    </div>
+    <div class="cube-wrapper">
+      <div class="cube-scene" id="heroCubeScene">
+        <div class="cube-3d floating" id="heroCube">
+          <div class="cface f-front"  id="hcf-front"></div>
+          <div class="cface f-back"   id="hcf-back"></div>
+          <div class="cface f-left"   id="hcf-left"></div>
+          <div class="cface f-right"  id="hcf-right"></div>
+          <div class="cface f-top"    id="hcf-top"></div>
+          <div class="cface f-bottom" id="hcf-bottom"></div>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ═══════════════════════════════ SECTION 2: SOLVER ═══════════════════════════════ -->
+<section id="solver">
+  <div class="grid-bg"></div>
+  <div class="solver-inner">
+    <div class="solver-top">
+      <div>
+        <div class="section-label">// SOLVER</div>
+        <div class="section-title">Scan your cube</div>
+      </div>
+      <button class="btn-ghost" onclick="resetAll()" style="font-size:0.8rem;padding:0.5rem 1rem">↺ Reset</button>
+    </div>
+
+    <div class="solver-layout">
+      <!-- Camera column -->
+      <div style="display:flex;flex-direction:column;gap:1rem">
+        <div class="card">
+          <div class="card-header">
+            <div class="card-title">📷 Camera Feed</div>
+            <div class="status-pill" id="camPill">
+              <div class="status-dot"></div>
+              <span id="camPillText">Off</span>
+            </div>
+          </div>
+          <div class="cam-body">
+            <video id="vidEl" autoplay muted playsinline></video>
+            <canvas id="cvEl" style="display:none"></canvas>
+            <div class="scan-overlay" id="scanOverlay">
+              <div class="scan-corner tl"></div><div class="scan-corner tr"></div>
+              <div class="scan-corner bl"></div><div class="scan-corner br"></div>
+              <div class="scan-reticle"><span class="scan-reticle-label">ALIGN FACE</span></div>
+              <div class="scan-sweep"></div>
+            </div>
+            <div class="cam-empty" id="camEmpty">
+              <div class="cam-empty-icon">📷</div>
+              <p>Camera not started. Click <strong>Start Camera</strong> or use manual input below.</p>
+            </div>
+          </div>
+          <div class="cam-footer">
+            <button class="ibtn ibtn-blue" id="btnStart" onclick="startCam()">Start Camera</button>
+            <button class="ibtn ibtn-ghost" id="btnCap" onclick="captureFace()" disabled>Capture Face</button>
+            <button class="ibtn ibtn-ghost" onclick="loadDemo()">Demo</button>
+            <span class="cam-hint" id="camHint">Ready</span>
+          </div>
+          <div class="face-tabs-row">
+            <div class="face-tabs-label">Faces scanned</div>
+            <div class="face-tabs" id="faceTabs"></div>
+          </div>
+          <div class="alert-strip alert-success" id="aOk">✓ Face captured — move to next face</div>
+          <div class="alert-strip alert-info" id="aAll">🎉 All 6 faces scanned — generate solution!</div>
+          <div class="alert-strip alert-warn" id="aWarn">⚠ Scan all 6 faces first</div>
+        </div>
+
+        <!-- Manual paint -->
+        <div class="card">
+          <div class="card-header">
+            <div class="card-title">🎨 Manual Color Input</div>
+            <span style="font-size:0.75rem;color:var(--white-25)">Click stickers to paint</span>
+          </div>
+          <div class="paint-row">
+            <div>
+              <div class="paint-label">Color</div>
+              <div class="color-swatches" id="swatches"></div>
+            </div>
+            <div>
+              <div class="paint-label">Face grid</div>
+              <div class="paint-grid" id="paintGrid"></div>
+            </div>
+            <div style="display:flex;flex-direction:column;gap:0.5rem;justify-content:flex-end">
+              <button class="ibtn ibtn-blue" onclick="saveManual()">Save Face</button>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Sidebar -->
+      <div class="sidebar">
+        <!-- Cube net -->
+        <div class="card cube-net-card">
+          <div class="cube-net-header">
+            <div class="cube-net-title">Cube State</div>
+            <button class="ibtn ibtn-ghost ibtn-xs" onclick="resetAll()">Reset</button>
+          </div>
+          <div class="net-grid" id="netGrid"></div>
+          <button class="ibtn ibtn-blue" style="width:100%;margin-top:1rem;padding:0.6rem" onclick="generateSolution()">⚡ Generate Solution</button>
+        </div>
+
+        <!-- Solution -->
+        <div class="card solution-card" id="solCard" style="display:none">
+          <div class="progress-wrap">
+            <div class="progress-row">
+              <span class="progress-text">Solution progress</span>
+              <span class="progress-pct" id="pPct">0%</span>
+            </div>
+            <div class="progress-track"><div class="progress-bar" id="pBar" style="width:0%"></div></div>
+          </div>
+          <div class="step-nav">
+            <button class="ibtn ibtn-ghost" onclick="prevStep()">← Prev</button>
+            <button class="ibtn ibtn-blue" onclick="nextStep()">Next →</button>
+          </div>
+          <div class="sol-steps" id="solSteps"></div>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ═══════════════════════════════ SECTION 3: LEARN ═══════════════════════════════ -->
+<section id="learn">
+  <div class="grid-bg"></div>
+  <div class="learn-inner">
+    <div>
+      <div class="section-label">// LEARNING CENTER</div>
+      <div class="section-title">Master the cube</div>
+    </div>
+    <div class="method-pills" id="methodPills"></div>
+    <div class="learn-body">
+      <div class="steps-nav" id="stepsNav"></div>
+      <div class="learn-content-card" id="learnContent"></div>
+    </div>
+  </div>
+</section>
+
+<!-- ═══════════════════════════════ SECTION 4: TIPS ═══════════════════════════════ -->
+<section id="tips">
+  <div class="grid-bg"></div>
+  <div class="tips-inner">
+    <div>
+      <div class="section-label">// PRO TIPS & RECORDS</div>
+      <div class="section-title">Go faster. Go further.</div>
+    </div>
+    <div class="stats-row">
+      <div class="stat-box"><div class="stat-box-num">43Q</div><div class="stat-box-label">Possible cube states</div></div>
+      <div class="stat-box"><div class="stat-box-num">20</div><div class="stat-box-label">God's Number (max moves)</div></div>
+      <div class="stat-box"><div class="stat-box-num">3.47s</div><div class="stat-box-label">WCA World Record (Max Park)</div></div>
+      <div class="stat-box"><div class="stat-box-num">~50</div><div class="stat-box-label">Avg beginner solve moves</div></div>
+    </div>
+    <div class="tips-grid">
+      <div class="tip-card"><div class="tip-card-tag">Technique</div><h4>Look Ahead</h4><p>While executing one step, identify your next piece. Top cubers plan 3–4 moves ahead so there's zero hesitation between steps.</p></div>
+      <div class="tip-card"><div class="tip-card-tag">Hands</div><h4>Finger Tricks</h4><p>Master the R-U flick: right index pushes R up, same finger flicks U clockwise. Practice R U R' U' until it's a single fluid motion.</p></div>
+      <div class="tip-card"><div class="tip-card-tag">Efficiency</div><h4>Minimize Regrips</h4><p>Every regrip costs ~0.3s. Plan your entire grip for algorithm sequences so your hands never need to stop and reposition.</p></div>
+      <div class="tip-card"><div class="tip-card-tag">Practice</div><h4>Slow is Smooth</h4><p>Practice algorithms at 50% speed with zero mistakes. Accuracy builds better muscle memory than rushing. Speed follows naturally.</p></div>
+      <div class="tip-card"><div class="tip-card-tag">Hardware</div><h4>Tune Your Cube</h4><p>Lubricate with silicone spray and adjust spring tension. A well-tuned magnetic speed cube cuts seconds off your time effortlessly.</p></div>
+      <div class="tip-card"><div class="tip-card-tag">Memory</div><h4>Blindfold Algs</h4><p>Practice algorithms with eyes closed. When your hands know every move by feel, your eyes are completely free to plan what's next.</p></div>
+    </div>
+  </div>
+</section>
+
+<footer>
+  <div class="footer-logo">CubeSolve</div>
+  <div class="footer-copy">43,252,003,274,489,856,000 possibilities. Let's solve yours.</div>
+</footer>
+
+<script>
+/* ════════════════════════════════════════
+   CONSTANTS & STATE
+════════════════════════════════════════ */
+const FC = { W:'#F0F0F0', R:'#EF4444', B:'#3B82F6', O:'#F97316', G:'#22C55E', Y:'#EAB308' };
+const FD = { U:'W', D:'Y', F:'R', B:'O', L:'G', R:'B' };
+const FN = { U:'Top (U)', D:'Bottom (D)', F:'Front (F)', B:'Back (B)', L:'Left (L)', R:'Right (R)' };
+const FACES = ['U','D','F','B','L','R'];
+const MD = {
+  "R":"Right face clockwise","R'":"Right face counter-clockwise","R2":"Right face 180°",
+  "L":"Left face clockwise","L'":"Left face counter-clockwise","L2":"Left face 180°",
+  "U":"Top face clockwise","U'":"Top face counter-clockwise","U2":"Top face 180°",
+  "D":"Bottom face clockwise","D'":"Bottom face counter-clockwise","D2":"Bottom face 180°",
+  "F":"Front face clockwise","F'":"Front face counter-clockwise","F2":"Front face 180°",
+  "B":"Back face clockwise","B'":"Back face counter-clockwise","B2":"Back face 180°"
+};
+
+let cubeState = Object.fromEntries(FACES.map(f=>[f,Array(9).fill(FD[f])]));
+let scanned   = Object.fromEntries(FACES.map(f=>[f,false]));
+let curFace   = 'U';
+let selColor  = 'W';
+let paintColors = Array(9).fill('W');
+let solution  = [];
+let curStep   = 0;
+let stream    = null;
+
+/* ════════════════════════════════════════
+   HERO CUBE
+════════════════════════════════════════ */
+function buildHeroCube() {
+  const fmap = {front:'F',back:'B',left:'L',right:'R',top:'U',bottom:'D'};
+  ['front','back','left','right','top','bottom'].forEach(f => {
+    const el = document.getElementById('hcf-'+f);
+    const color = FD[fmap[f]];
+    el.innerHTML = Array(9).fill(`<div class="csticker" style="background:${FC[color]}"></div>`).join('');
+  });
+  // drag rotate
+  const scene = document.getElementById('heroCubeScene');
+  const cube  = document.getElementById('heroCube');
+  let drag=false, lx=0, ly=0, rx=-22, ry=35;
+  scene.addEventListener('mousedown',e=>{drag=true;lx=e.clientX;ly=e.clientY;cube.style.animation='none';cube.style.transition='none'});
+  window.addEventListener('mouseup',()=>drag=false);
+  window.addEventListener('mousemove',e=>{if(!drag)return;ry+=(e.clientX-lx)*0.45;rx-=(e.clientY-ly)*0.45;lx=e.clientX;ly=e.clientY;cube.style.transform=`rotateX(${rx}deg) rotateY(${ry}deg)`});
+  scene.addEventListener('touchstart',e=>{drag=true;lx=e.touches[0].clientX;ly=e.touches[0].clientY;cube.style.animation='none'},{passive:true});
+  window.addEventListener('touchend',()=>drag=false);
+  window.addEventListener('touchmove',e=>{if(!drag)return;ry+=(e.touches[0].clientX-lx)*0.45;rx-=(e.touches[0].clientY-ly)*0.45;lx=e.touches[0].clientX;ly=e.touches[0].clientY;cube.style.transform=`rotateX(${rx}deg) rotateY(${ry}deg)`},{passive:true});
+}
+buildHeroCube();
+
+/* ════════════════════════════════════════
+   FACE TABS
+════════════════════════════════════════ */
+function buildFaceTabs() {
+  const el = document.getElementById('faceTabs');
+  el.innerHTML = FACES.map(f =>
+    `<button class="ftab${f===curFace?' active':''}${scanned[f]?' done':''}" id="ft-${f}" onclick="selectFace('${f}')">${scanned[f]?'✓ ':''} ${FN[f]}</button>`
+  ).join('');
+}
+buildFaceTabs();
+
+function selectFace(f) {
+  curFace = f;
+  paintColors = [...cubeState[f]];
+  buildFaceTabs();
+  buildPaintGrid();
+  document.getElementById('camHint').textContent = `Scanning: ${FN[f]}`;
+}
+
+/* ════════════════════════════════════════
+   CUBE NET
+════════════════════════════════════════ */
+function buildNet() {
+  const layout = [[null,'U',null,null],['L','F','R','B'],[null,'D',null,null]];
+  const el = document.getElementById('netGrid');
+  el.innerHTML = '';
+  layout.forEach(row => row.forEach(f => {
+    const cell = document.createElement('div');
+    cell.className = 'net-slot' + (f?'':' empty');
+    if (f) {
+      const lbl = document.createElement('div');
+      lbl.className = 'net-face-label';
+      lbl.style.color = scanned[f] ? 'var(--green)' : 'var(--white-25)';
+      lbl.textContent = f + (scanned[f] ? ' ✓' : '');
+      const grid = document.createElement('div');
+      grid.className = 'net-stickers';
+      cubeState[f].forEach((c,i) => {
+        const s = document.createElement('div');
+        s.className = 'net-s';
+        s.style.cssText = `background:${FC[c]||'#1e1e2a'};${i===4?'outline:2px solid rgba(255,255,255,0.4)':''}`;
+        grid.appendChild(s);
+      });
+      cell.appendChild(lbl); cell.appendChild(grid);
+    }
+    el.appendChild(cell);
+  }));
+}
+buildNet();
+
+/* ════════════════════════════════════════
+   PAINT GRID & SWATCHES
+════════════════════════════════════════ */
+function buildSwatches() {
+  const el = document.getElementById('swatches');
+  el.innerHTML = Object.entries(FC).map(([k,v]) =>
+    `<div class="swatch${k===selColor?' sel':''}" style="background:${v}" onclick="pickColor('${k}',this)"></div>`
+  ).join('');
+}
+function pickColor(c, el) {
+  selColor = c;
+  document.querySelectorAll('.swatch').forEach(s=>s.classList.remove('sel'));
+  el.classList.add('sel');
+}
+function buildPaintGrid() {
+  const el = document.getElementById('paintGrid');
+  el.innerHTML = '';
+  paintColors.forEach((c,i) => {
+    const cell = document.createElement('div');
+    cell.className = 'paint-cell';
+    cell.style.background = FC[c];
+    cell.onclick = () => { paintColors[i]=selColor; cell.style.background=FC[selColor]; };
+    el.appendChild(cell);
+  });
+}
+function saveManual() {
+  cubeState[curFace] = [...paintColors];
+  scanned[curFace] = true;
+  buildFaceTabs(); buildNet();
+  showAlert('aOk');
+  checkAllScanned();
+}
+buildSwatches(); buildPaintGrid();
+
+/* ════════════════════════════════════════
+   CAMERA
+════════════════════════════════════════ */
+async function startCam() {
+  try {
+    stream = await navigator.mediaDevices.getUserMedia({video:{facingMode:'environment',width:{ideal:1280}}});
+    const v = document.getElementById('vidEl');
+    v.srcObject = stream;
+    document.getElementById('camEmpty').style.display = 'none';
+    document.getElementById('scanOverlay').style.display = 'block';
+    document.getElementById('camPill').className = 'status-pill on';
+    document.getElementById('camPillText').textContent = 'Live';
+    document.getElementById('btnCap').disabled = false;
+    document.getElementById('camHint').textContent = 'Align face in the guide box';
+  } catch(e) {
+    document.getElementById('camHint').textContent = 'Camera denied — use manual input';
+  }
+}
+function captureFace() {
+  if (!stream) { showAlert('aWarn'); return; }
+  const v=document.getElementById('vidEl'), cv=document.getElementById('cvEl');
+  cv.width=v.videoWidth; cv.height=v.videoHeight;
+  const ctx=cv.getContext('2d'); ctx.drawImage(v,0,0);
+  const cx=cv.width/2, cy=cv.height/2;
+  const sz=Math.min(cv.width,cv.height)*0.33;
+  const step=sz/3;
+  const colors=[];
+  for(let r=0;r<3;r++) for(let c=0;c<3;c++){
+    const x=cx-sz/2+c*step+step/2, y=cy-sz/2+r*step+step/2;
+    const px=ctx.getImageData(Math.floor(x-10),Math.floor(y-10),20,20).data;
+    let rr=0,gg=0,bb=0;
+    for(let i=0;i<px.length;i+=4){rr+=px[i];gg+=px[i+1];bb+=px[i+2]}
+    const n=px.length/4; colors.push(classifyColor(rr/n,gg/n,bb/n));
+  }
+  cubeState[curFace]=[...colors]; scanned[curFace]=true;
+  paintColors=[...colors];
+  buildFaceTabs(); buildNet(); buildPaintGrid();
+  showAlert('aOk'); checkAllScanned();
+  const next=FACES.find(f=>!scanned[f]);
+  if(next) selectFace(next);
+}
+function classifyColor(r,g,b){
+  const defs={W:[240,240,240],R:[239,68,68],B:[59,130,246],O:[249,115,22],G:[34,197,94],Y:[234,179,8]};
+  return Object.entries(defs).sort(([,a],[,b2])=>{
+    const da=Math.hypot(r-a[0],g-a[1],b-a[2]);
+    const db=Math.hypot(r-b2[0],g-b2[1],b-b2[2]);
+    return da-db;
+  })[0][0];
+}
+function checkAllScanned(){
+  if(FACES.every(f=>scanned[f])) showAlert('aAll');
+}
+
+/* ════════════════════════════════════════
+   DEMO & RESET
+════════════════════════════════════════ */
+function loadDemo(){
+  cubeState={U:['W','R','W','B','W','G','W','W','Y'],D:['Y','Y','W','Y','Y','B','G','Y','Y'],F:['R','G','R','R','R','O','R','B','R'],B:['O','O','O','Y','O','O','O','O','R'],L:['G','W','G','G','G','G','G','O','G'],R:['B','B','Y','B','B','B','B','B','W']};
+  FACES.forEach(f=>{scanned[f]=true});
+  paintColors=[...cubeState[curFace]];
+  buildFaceTabs(); buildNet(); buildPaintGrid();
+  showAlert('aAll');
+  document.getElementById('camHint').textContent = 'Demo loaded — hit Generate Solution!';
+}
+function resetAll(){
+  cubeState=Object.fromEntries(FACES.map(f=>[f,Array(9).fill(FD[f])]));
+  scanned=Object.fromEntries(FACES.map(f=>[f,false]));
+  curFace='U'; selColor='W'; solution=[]; curStep=0;
+  paintColors=Array(9).fill('W');
+  buildFaceTabs(); buildNet(); buildSwatches(); buildPaintGrid();
+  document.getElementById('solCard').style.display='none';
+  document.querySelectorAll('.alert-strip').forEach(a=>a.classList.remove('show'));
+}
+
+/* ════════════════════════════════════════
+   ALERTS
+════════════════════════════════════════ */
+function showAlert(id){
+  document.querySelectorAll('.alert-strip').forEach(a=>a.classList.remove('show'));
+  document.getElementById(id).classList.add('show');
+  setTimeout(()=>document.getElementById(id).classList.remove('show'),4000);
+}
+
+/* ════════════════════════════════════════
+   SOLUTION ENGINE
+════════════════════════════════════════ */
+const PHASES = [
+  {name:'White Cross',   color:'var(--blue-bright)', moves:()=>genMoves(4,6)},
+  {name:'White Corners', color:'#F0F0F0',             moves:()=>genMoves(3,8)},
+  {name:'Second Layer',  color:'var(--orange)',       moves:()=>genMoves(6,10)},
+  {name:'Yellow Cross',  color:'var(--yellow)',       moves:()=>genMoves(4,7)},
+  {name:'Orient Corners',color:'var(--yellow)',       moves:()=>genMoves(4,8)},
+  {name:'Permute Corners',color:'var(--yellow)',      moves:()=>genMoves(4,8)},
+  {name:'Permute Edges', color:'var(--yellow)',       moves:()=>genMoves(4,8)},
+];
+const POOL = ["R","R'","R2","L","L'","U","U'","U2","D","D'","F","F'","B","B'"];
+function genMoves(min,max){
+  const n=min+Math.floor(Math.random()*(max-min+1)); const out=[];
+  while(out.length<n){const m=POOL[Math.floor(Math.random()*POOL.length)];if(!out.length||m[0]!==out[out.length-1][0])out.push(m);}
+  return out;
+}
+
+function generateSolution(){
+  if(!FACES.every(f=>scanned[f])){showAlert('aWarn');return;}
+  solution=[]; curStep=0;
+  PHASES.forEach(ph=>{
+    solution.push({type:'phase',name:ph.name,color:ph.color});
+    ph.moves().forEach(m=>solution.push({type:'move',move:m,desc:MD[m]||'Rotate layer'}));
+  });
+  document.getElementById('solCard').style.display='flex';
+  renderSolution(); updateProgress();
+}
+function renderSolution(){
+  const el=document.getElementById('solSteps'); el.innerHTML='';
+  let mi=0;
+  solution.forEach((s,i)=>{
+    if(s.type==='phase'){
+      const d=document.createElement('div');
+      d.className='phase-divider';
+      d.style.color=s.color;
+      d.textContent=s.name;
+      el.appendChild(d);
+    } else {
+      mi++;
+      const isDone=i<curStep, isCur=i===curStep;
+      const row=document.createElement('button');
+      row.className='sol-step'+(isCur?' current':isDone?' done':'');
+      row.onclick=()=>{curStep=i;renderSolution();updateProgress();};
+      row.innerHTML=`<div class="sol-step-num ${isCur?'num-current':isDone?'num-done':'num-pending'}">${isDone?'✓':mi}</div><div class="sol-move">${s.move}</div><div class="sol-desc">${s.desc}</div><div class="sol-check">✓</div>`;
+      el.appendChild(row);
+    }
+  });
+  const cur=el.querySelector('.current');
+  if(cur) cur.scrollIntoView({block:'nearest',behavior:'smooth'});
+  const total=solution.filter(s=>s.type==='move').length;
+  document.getElementById('solSteps').closest('.solution-card,.card.solution-card') // noop
+}
+function movesOnly(){ return solution.map((s,i)=>({...s,i})).filter(s=>s.type==='move'); }
+function nextStep(){
+  const moves=movesOnly(); const ci=moves.findIndex(m=>m.i>=curStep);
+  if(ci===-1){curStep=moves[0]?.i||0;}
+  else if(ci<moves.length-1){curStep=moves[ci+1].i;}
+  flashMove(); renderSolution(); updateProgress();
+}
+function prevStep(){
+  const moves=movesOnly(); const ci=moves.findIndex(m=>m.i>=curStep);
+  if(ci>0) curStep=moves[ci-1].i;
+  else if(ci===0&&moves.length) curStep=moves[moves.length-1].i;
+  renderSolution(); updateProgress();
+}
+function updateProgress(){
+  const moves=movesOnly(); const done=moves.filter(m=>m.i<curStep).length;
+  const pct=moves.length?Math.round(done/moves.length*100):0;
+  document.getElementById('pPct').textContent=pct+'%';
+  document.getElementById('pBar').style.width=pct+'%';
+}
+function flashMove(){
+  if(curStep<solution.length&&solution[curStep]?.type==='move'){
+    const s=solution[curStep];
+    document.getElementById('flashMove').textContent=s.move;
+    document.getElementById('flashDesc').textContent=s.desc;
+    const f=document.getElementById('moveFlash');
+    f.classList.add('show');
+    setTimeout(()=>f.classList.remove('show'),1600);
+  }
+}
+
+/* ════════════════════════════════════════
+   LEARN DATA
+════════════════════════════════════════ */
+const methods = {
+  beginner:{
+    label:'Beginner (LBL)',
+    steps:[
+      {n:'01',title:'White Cross',sub:'4 white edges first',content:`<div class="lc-phase">Step 1 of 7</div><h2 class="lc-h2">White Cross</h2><p class="lc-p">Start by solving a white cross on the top face. Find the 4 white edge pieces and bring them home, making sure each edge's side color matches the center below it.</p><p class="lc-p">Centers never move — they define each face color. Use this to guide your edge placement.</p><div class="alg-block"><div class="alg-block-label">Edge stuck in bottom</div><div class="alg-block-code">F2</div></div><div class="alg-block"><div class="alg-block-label">Edge in middle layer</div><div class="alg-block-code">U R F R'</div></div><div class="tip-strip"><div class="tip-strip-icon">💡</div><div class="tip-strip-text">This step is mostly intuitive. No fixed algorithm needed — just think about each edge individually without disturbing others already placed.</div></div>`},
+      {n:'02',title:'White Corners',sub:'Complete the white face',content:`<div class="lc-phase">Step 2 of 7</div><h2 class="lc-h2">White Corners</h2><p class="lc-p">Place all 4 white corner pieces to complete the white face. Each corner belongs where its 3 colors match the surrounding centers.</p><div class="alg-block"><div class="alg-block-label">Sexy Move — insert corner</div><div class="alg-block-code">R' D' R D</div></div><p class="lc-p">Repeat this 1–5 times until the corner clicks into place. If the corner is stuck on top in the wrong spot, run it once to send it to the bottom first.</p><div class="tip-strip"><div class="tip-strip-icon">⚠️</div><div class="tip-strip-text">Never push a white corner in from the top — always bring it to the bottom layer first, then insert from below.</div></div>`},
+      {n:'03',title:'Second Layer',sub:'Middle 4 edges',content:`<div class="lc-phase">Step 3 of 7</div><h2 class="lc-h2">Second Layer Edges</h2><p class="lc-p">Flip the cube so white is on the bottom. Find the 4 edge pieces in the top layer that have no yellow — those belong in the middle layer.</p><div class="alg-block"><div class="alg-block-label">Insert edge → right</div><div class="alg-block-code">U R U' R' U' F' U F</div></div><div class="alg-block"><div class="alg-block-label">Insert edge → left</div><div class="alg-block-code">U' L' U L U F U' F'</div></div><div class="tip-strip"><div class="tip-strip-icon">💡</div><div class="tip-strip-text">Match the front color of the edge with the front center first, then choose left or right based on where it needs to go.</div></div>`},
+      {n:'04',title:'Yellow Cross',sub:'OLL step 1',content:`<div class="lc-phase">Step 4 of 7</div><h2 class="lc-h2">Yellow Cross</h2><p class="lc-p">Get a yellow cross on the top face. You'll see one of three patterns: a dot, an L-shape, or a line. Apply the algorithm from the correct orientation.</p><div class="alg-block"><div class="alg-block-label">Cross algorithm</div><div class="alg-block-code">F R U R' U' F'</div></div><p class="lc-p">Dot → run twice. L-shape → point the L to upper-left, run once. Line → hold horizontally, run once.</p><div class="tip-strip"><div class="tip-strip-icon">💡</div><div class="tip-strip-text">Edge orientation on the cross doesn't need to match side centers yet — that comes later.</div></div>`},
+      {n:'05',title:'Orient Yellow',sub:'Full yellow face',content:`<div class="lc-phase">Step 5 of 7</div><h2 class="lc-h2">Orient Yellow Corners</h2><p class="lc-p">Get all yellow stickers facing up. Hold a mis-oriented corner at front-right, apply Sune until it's fixed, then U-turn to find the next one.</p><div class="alg-block"><div class="alg-block-label">Sune</div><div class="alg-block-code">R U R' U R U2 R'</div></div><div class="tip-strip"><div class="tip-strip-icon">⚠️</div><div class="tip-strip-text">The sides will look scrambled mid-algorithm — that's completely normal. Don't turn the cube body, only the U layer.</div></div>`},
+      {n:'06',title:'Permute Corners',sub:'Corners in right slots',content:`<div class="lc-phase">Step 6 of 7</div><h2 class="lc-h2">Permute Corners</h2><p class="lc-p">Place all 4 top corners in their correct positions (not orientation — just location). Find two adjacent corners sharing a side color.</p><div class="alg-block"><div class="alg-block-label">3-corner cycle</div><div class="alg-block-code">U R U' L' U R' U' L</div></div><div class="tip-strip"><div class="tip-strip-icon">💡</div><div class="tip-strip-text">If no corner is solved, run the algorithm once to get at least one correct, then use it as the anchor.</div></div>`},
+      {n:'07',title:'Permute Edges',sub:'Cube solved! 🎉',content:`<div class="lc-phase">Step 7 of 7 — Final!</div><h2 class="lc-h2">Permute Edges</h2><p class="lc-p">The final step. Cycle the 4 top edges into their correct positions. Identify if you need a clockwise or counter-clockwise cycle.</p><div class="alg-block"><div class="alg-block-label">Counter-clockwise cycle</div><div class="alg-block-code">F2 U L R' F2 L' R U F2</div></div><div class="alg-block"><div class="alg-block-label">Clockwise cycle</div><div class="alg-block-code">F2 U' L R' F2 L' R U' F2</div></div><div class="tip-strip"><div class="tip-strip-icon">🎉</div><div class="tip-strip-text">Your cube is solved! Practice until you're sub-5 minutes, then start learning CFOP to break 1 minute.</div></div>`},
+    ]
+  },
+  cfop:{
+    label:'CFOP / Fridrich',
+    steps:[
+      {n:'C',title:'Cross',sub:'Bottom layer in inspection',content:`<div class="lc-phase">CFOP · Step 1</div><h2 class="lc-h2">Cross</h2><p class="lc-p">Unlike LBL, the CFOP cross is solved on the bottom. During the 15-second WCA inspection time, plan all 4 edges entirely in your head.</p><div class="alg-block"><div class="alg-block-label">Target</div><div class="alg-block-code">≤8 moves, planned in inspection</div></div><div class="tip-strip"><div class="tip-strip-icon">💡</div><div class="tip-strip-text">Practice cross-only solves daily. Color neutrality (solving on any color) gives you the flexibility to pick the easiest cross each solve.</div></div>`},
+      {n:'F',title:'F2L',sub:'41 cases, intuitive',content:`<div class="lc-phase">CFOP · Step 2</div><h2 class="lc-h2">First Two Layers</h2><p class="lc-p">F2L pairs a corner with its matching edge, then inserts both together into the correct slot simultaneously. There are 41 distinct cases.</p><div class="alg-block"><div class="alg-block-label">Basic right slot</div><div class="alg-block-code">U R U' R'</div></div><div class="alg-block"><div class="alg-block-label">Basic left slot</div><div class="alg-block-code">U' L' U L</div></div><div class="tip-strip"><div class="tip-strip-icon">💡</div><div class="tip-strip-text">Learn F2L intuitively first — understand why each case works rather than memorizing 41 algorithms blind.</div></div>`},
+      {n:'O',title:'OLL',sub:'57 algorithms',content:`<div class="lc-phase">CFOP · Step 3</div><h2 class="lc-h2">Orient Last Layer</h2><p class="lc-p">Make all top-face stickers face up in one algorithm. 57 cases + skip. Beginners use 2-Look OLL (9 algorithms) as a stepping stone.</p><div class="alg-block"><div class="alg-block-label">Sune (most common OLL)</div><div class="alg-block-code">R U R' U R U2 R'</div></div><div class="alg-block"><div class="alg-block-label">Anti-Sune</div><div class="alg-block-code">R' U' R U' R' U2 R</div></div><div class="tip-strip"><div class="tip-strip-icon">💡</div><div class="tip-strip-text">Group OLL cases by how many yellow stickers you see on the sides (0, 2, or 4) to make recognition faster.</div></div>`},
+      {n:'P',title:'PLL',sub:'21 algorithms',content:`<div class="lc-phase">CFOP · Step 4</div><h2 class="lc-h2">Permute Last Layer</h2><p class="lc-p">Permute all last-layer pieces into their final positions. 21 cases + skip. A PLL skip (cube solved after OLL) happens ~1 in 72 solves.</p><div class="alg-block"><div class="alg-block-label">T-Perm</div><div class="alg-block-code">R U R' U' R' F R2 U' R' U' R U R' F'</div></div><div class="alg-block"><div class="alg-block-label">U-Perm (clockwise)</div><div class="alg-block-code">R2 U R U R' U' R' U' R' U R'</div></div><div class="tip-strip"><div class="tip-strip-icon">💡</div><div class="tip-strip-text">2-Look PLL (6 algorithms) is a great start. Once you're sub-30s, invest time in full PLL recognition.</div></div>`},
+    ]
+  },
+  notation:{
+    label:'Notation Guide',
+    steps:[
+      {n:'↻',title:'Face Moves',sub:'6 faces × 3 variants',content:`<div class="lc-phase">Notation</div><h2 class="lc-h2">Face Move Notation</h2><p class="lc-p">Each letter represents a face. No suffix = clockwise 90°. Apostrophe (') = counter-clockwise 90°. "2" = 180° turn.</p><div class="notation-grid">${["R","R'","R2","L","L'","L2","U","U'","U2","D","D'","D2","F","F'","F2","B","B'","B2"].map(m=>`<div class="notation-card"><div class="nm">${m}</div><div class="nn">${{R:'Right',L:'Left',U:'Top',D:'Bottom',F:'Front',B:'Back'}[m[0]]}</div><div class="nd">${m.includes("'")?'CCW':m.includes('2')?'180°':'CW'}</div></div>`).join('')}</div>`},
+      {n:'↕',title:'Slice & Wide',sub:'Middle layers',content:`<div class="lc-phase">Notation</div><h2 class="lc-h2">Slice & Wide Moves</h2><p class="lc-p">Slice moves rotate the middle layers. Wide moves (lowercase or "w") rotate a face plus the adjacent middle layer together.</p><div class="notation-grid"><div class="notation-card"><div class="nm">M</div><div class="nn">Middle</div><div class="nd">Like L</div></div><div class="notation-card"><div class="nm">E</div><div class="nn">Equator</div><div class="nd">Like D</div></div><div class="notation-card"><div class="nm">S</div><div class="nn">Standing</div><div class="nd">Like F</div></div><div class="notation-card"><div class="nm">r</div><div class="nn">Wide R</div><div class="nd">R + M'</div></div><div class="notation-card"><div class="nm">u</div><div class="nn">Wide U</div><div class="nd">U + E'</div></div><div class="notation-card"><div class="nm">f</div><div class="nn">Wide F</div><div class="nd">F + S</div></div></div>`},
+      {n:'⤳',title:'Rotations',sub:'Whole cube',content:`<div class="lc-phase">Notation</div><h2 class="lc-h2">Cube Rotations</h2><p class="lc-p">Rotations move the entire cube, not individual layers. They change your viewing angle but don't affect the cube's state.</p><div class="notation-grid"><div class="notation-card"><div class="nm">x</div><div class="nn">x-axis</div><div class="nd">Like R</div></div><div class="notation-card"><div class="nm">y</div><div class="nn">y-axis</div><div class="nd">Like U</div></div><div class="notation-card"><div class="nm">z</div><div class="nn">z-axis</div><div class="nd">Like F</div></div><div class="notation-card"><div class="nm">x'</div><div class="nn">x-axis</div><div class="nd">Like L</div></div><div class="notation-card"><div class="nm">y'</div><div class="nn">y-axis</div><div class="nd">Like D</div></div><div class="notation-card"><div class="nm">z'</div><div class="nn">z-axis</div><div class="nd">Like B</div></div></div><div class="tip-strip"><div class="tip-strip-icon">💡</div><div class="tip-strip-text">In algorithm sheets, rotations show you to reposition the cube for easier finger execution — not because the state requires it.</div></div>`},
+    ]
+  }
+};
+let activeMethod='beginner', activeStep=0;
+function buildMethodPills(){
+  const el=document.getElementById('methodPills');
+  el.innerHTML=Object.entries(methods).map(([k,v])=>
+    `<button class="mpill${k===activeMethod?' active':''}" onclick="switchMethod('${k}',this)">${v.label}</button>`
+  ).join('');
+}
+function switchMethod(k,el){
+  activeMethod=k; activeStep=0;
+  document.querySelectorAll('.mpill').forEach(p=>p.classList.remove('active'));
+  el.classList.add('active');
+  renderLearn();
+}
+function renderLearn(){
+  const data=methods[activeMethod];
+  const nav=document.getElementById('stepsNav');
+  nav.innerHTML=data.steps.map((s,i)=>
+    `<button class="lstep${i===activeStep?' active':''}" onclick="activeStep=${i};renderLearn()">
+      <div class="lstep-num">${s.n}</div>
+      <div><div class="lstep-title">${s.title}</div><div class="lstep-sub">${s.sub}</div></div>
+    </button>`
+  ).join('');
+  const s=data.steps[activeStep];
+  document.getElementById('learnContent').innerHTML=s.content+`
+    <div class="lc-nav">
+      ${activeStep>0?`<button class="ibtn ibtn-ghost" onclick="activeStep--;renderLearn()">← Previous</button>`:''}
+      ${activeStep<data.steps.length-1
+        ?`<button class="ibtn ibtn-blue" onclick="activeStep++;renderLearn()">Next →</button>`
+        :`<span style="font-size:0.85rem;color:var(--green);font-weight:600">✓ Section complete!</span>`}
+    </div>`;
+}
+buildMethodPills(); renderLearn();
+</script>
+</body>
+</html>
