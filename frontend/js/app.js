@@ -4,9 +4,10 @@
  * Main application entry point.
  *
  * Responsibilities:
- *  • Shared state (cubeState, scanned, curFace, …)
- *  • API call to POST /api/solve
+ *  • Shared state (cubeState, scanned, curFace, solverMethod, …)
+ *  • API call to POST /api/solve with settings & comparative stats
  *  • Solution rendering, step navigation, progress bar, move flash
+ *  • Academic performance metrics & comparison dashboards
  *  • Demo loader, full reset
  *  • Alert helpers
  *  • Bootstrap: initialise all modules on DOMContentLoaded
@@ -21,8 +22,12 @@ import { buildMethodPills, renderLearn }          from './learn.js';
 /* ── Constants ─────────────────────────────────────────────────────────── */
 
 export const FC = {
-  W: '#F0F0F0', R: '#EF4444', B: '#3B82F6',
-  O: '#F97316', G: '#22C55E', Y: '#EAB308'
+  W: '#EFEFEF',   // White
+  R: '#C41E3A',   // Red
+  B: '#1C4B8C',   // Blue
+  O: '#FF5800',   // Orange
+  G: '#009B48',   // Green
+  Y: '#FFD500',   // Yellow
 };
 
 export const FD = { U:'W', D:'Y', F:'R', B:'O', L:'G', R:'B' };
@@ -39,13 +44,14 @@ const API_BASE = '';   // Same-origin
 /* ── Shared state ────────────────────────────────────────────────────────── */
 
 export const state = {
-  cubeState:   Object.fromEntries(FACES.map(f => [f, Array(9).fill(FD[f])])),
-  scanned:     Object.fromEntries(FACES.map(f => [f, false])),
-  curFace:     'U',
-  selColor:    'W',
-  paintColors: Array(9).fill('W'),
-  solution:    [],
-  curStep:     0,
+  cubeState:    Object.fromEntries(FACES.map(f => [f, Array(9).fill(FD[f])])),
+  scanned:      Object.fromEntries(FACES.map(f => [f, false])),
+  curFace:      'U',
+  selColor:     'W',
+  paintColors:  Array(9).fill('W'),
+  solution:     [],
+  curStep:      0,
+  solverMethod: 'kociemba'
 };
 
 /* ── State helpers ───────────────────────────────────────────────────────── */
@@ -102,6 +108,9 @@ export function resetAll() {
 
   buildFaceTabs(); buildNet(); buildSwatches(); buildPaintGrid();
   document.getElementById('solCard').style.display = 'none';
+  document.getElementById('metricsCard').style.display = 'none';
+  document.getElementById('compCard').style.display = 'none';
+  document.getElementById('kociembaInfoCard').style.display = 'none';
   document.querySelectorAll('.alert-strip').forEach(a => a.classList.remove('show'));
 }
 
@@ -116,16 +125,42 @@ export async function generateSolution() {
     const res  = await fetch(`${API_BASE}/api/solve`, {
       method:  'POST',
       headers: { 'Content-Type': 'application/json' },
-      body:    JSON.stringify({ faces: state.cubeState }),
+      body:    JSON.stringify({ faces: state.cubeState, method: state.solverMethod }),
     });
     const data = await res.json();
 
     if (!res.ok) throw new Error(data.error || 'Solver error');
 
+    // Populate solution
     state.solution = data.solution;
     document.getElementById('solCard').style.display = 'flex';
     renderSolution();
     updateProgress();
+
+    // Render Academic metrics card
+    document.getElementById('metricsCard').style.display = 'block';
+    document.getElementById('metLength').textContent = data.total_moves;
+    document.getElementById('metTime').textContent = `${data.solve_time_ms}ms`;
+    document.getElementById('metRot').textContent = data.rotations;
+    document.getElementById('metDepth').textContent = data.search_depth;
+    document.getElementById('metDiff').textContent = data.difficulty;
+
+    // Render comparison card
+    document.getElementById('compCard').style.display = 'block';
+    document.getElementById('compBegMoves').textContent = data.comparison.beginner.moves;
+    document.getElementById('compBegTime').textContent = `${data.comparison.beginner.time_ms}ms`;
+    document.getElementById('compKocMoves').textContent = data.comparison.kociemba.moves;
+    document.getElementById('compKocTime').textContent = `${data.comparison.kociemba.time_ms}ms`;
+    document.getElementById('compReductionPct').textContent = `${data.comparison.reduction_pct}%`;
+
+    // Render educational explanation card for Kociemba solver
+    const infoCard = document.getElementById('kociembaInfoCard');
+    if (state.solverMethod === 'kociemba') {
+      infoCard.style.display = 'block';
+    } else {
+      infoCard.style.display = 'none';
+    }
+
   } catch (err) {
     document.getElementById('camHint').textContent = `Error: ${err.message}`;
     showAlert('aWarn');
@@ -205,6 +240,10 @@ function flashMove() {
   }
 }
 
+export function changeSolver() {
+  state.solverMethod = document.getElementById('selSolver').value;
+}
+
 /* ── Expose globals for HTML onclick handlers ────────────────────────────── */
 
 window.__startCam          = startCam;
@@ -215,6 +254,7 @@ window.__generateSolution  = generateSolution;
 window.__saveManual        = saveManual;
 window.__nextStep          = nextStep;
 window.__prevStep          = prevStep;
+window.__changeSolver      = changeSolver;
 
 /* ── Bootstrap ───────────────────────────────────────────────────────────── */
 

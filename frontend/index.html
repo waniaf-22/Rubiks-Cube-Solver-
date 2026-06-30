@@ -113,6 +113,14 @@
           <div class="cam-body">
             <video id="vidEl" autoplay muted playsinline></video>
             <canvas id="cvEl" style="display:none"></canvas>
+            <canvas id="trackerCanvas"></canvas> <!-- Live boundary overlay -->
+
+            <!-- Scanner status indicators overlay -->
+            <div id="cvOverlay" style="display:none">
+              <div class="cv-badge" id="cvStatus">Scanning...</div>
+              <div class="cv-confidence">Confidence: <span id="cvConf">0%</span></div>
+              <div class="cv-auto-progress" id="cvProgress" style="width:0%"></div>
+            </div>
 
             <!-- Scan overlay (shown when camera is live) -->
             <div class="scan-overlay" id="scanOverlay">
@@ -153,6 +161,17 @@
           <div class="alert-strip alert-error"   id="aError">✕ Detection error — try manual input</div>
         </div>
 
+        <!-- Live detection preview card -->
+        <div class="card" id="previewCard" style="display:none">
+          <div class="card-header">
+            <div class="card-title">🔍 Perspective-Warped Preview</div>
+            <span style="font-size:0.75rem;color:var(--white-25)">Live classified colors</span>
+          </div>
+          <div class="preview-body" style="display:flex;justify-content:center;padding:1rem;background:#0c0c0f">
+            <img id="liveWarped" style="max-width:180px;border-radius:8px;border:1px solid var(--border)" src="" alt="Live Warped Face">
+          </div>
+        </div>
+
         <!-- Manual paint card -->
         <div class="card">
           <div class="card-header">
@@ -178,6 +197,20 @@
       <!-- ── Sidebar ── -->
       <div class="sidebar">
 
+        <!-- Solver Configuration -->
+        <div class="card">
+          <div class="card-header">
+            <div class="card-title">⚙️ Solver Settings</div>
+          </div>
+          <div style="padding:1rem;display:flex;flex-direction:column;gap:0.5rem">
+            <label style="font-size:0.75rem;color:var(--white-50);font-weight:600">Solving Algorithm</label>
+            <select id="selSolver" style="width:100%;padding:0.6rem;background:var(--bg);border:1px solid var(--border);border-radius:var(--radius-sm);color:var(--white);font-weight:600" onchange="window.__changeSolver()">
+              <option value="kociemba" selected>Kociemba Solver (Two-Phase / Near-Optimal)</option>
+              <option value="beginner">Beginner Method (LBL / 7-Phases)</option>
+            </select>
+          </div>
+        </div>
+
         <!-- Cube net / state card -->
         <div class="card cube-net-card">
           <div class="cube-net-header">
@@ -190,6 +223,70 @@
                   onclick="window.__generateSolution()">
             ⚡ Generate Solution
           </button>
+        </div>
+
+        <!-- Academic performance stats (hidden until solution generated) -->
+        <div class="card metrics-card" id="metricsCard" style="display:none">
+          <div class="card-header">
+            <div class="card-title">📊 Academic Solve Metrics</div>
+          </div>
+          <div class="metrics-grid">
+            <div class="metric-item"><div class="m-val" id="metLength">0</div><div class="m-lbl">Solution Length</div></div>
+            <div class="metric-item"><div class="m-val" id="metTime">0ms</div><div class="m-lbl">Solve Time</div></div>
+            <div class="metric-item"><div class="m-val" id="metRot">0</div><div class="m-lbl">Cube Rotations</div></div>
+            <div class="metric-item"><div class="m-val" id="metDepth">0</div><div class="m-lbl">Search Depth</div></div>
+          </div>
+          <div class="metric-footer-row">
+            <span>Estimated Difficulty:</span>
+            <strong id="metDiff" style="color:var(--green)">Advanced</strong>
+          </div>
+        </div>
+
+        <!-- Comparison breakdown card (hidden until solution generated) -->
+        <div class="card comparison-card" id="compCard" style="display:none">
+          <div class="card-header">
+            <div class="card-title">📈 Solver Performance Comparison</div>
+          </div>
+          <div class="comp-body">
+            <div class="comp-table">
+              <div class="comp-row comp-hdr">
+                <div>Metric</div>
+                <div>Beginner LBL</div>
+                <div>Kociemba</div>
+              </div>
+              <div class="comp-row">
+                <div>Moves</div>
+                <div id="compBegMoves">0</div>
+                <div id="compKocMoves" style="font-weight:700;color:var(--green)">0</div>
+              </div>
+              <div class="comp-row">
+                <div>Solve Time</div>
+                <div id="compBegTime">0ms</div>
+                <div id="compKocTime" style="font-weight:700;color:var(--green)">0ms</div>
+              </div>
+            </div>
+            <div class="comp-reduction">
+              <div class="reduction-badge"><span id="compReductionPct">0%</span></div>
+              <div class="reduction-lbl">Moves Reduction using Kociemba Algorithm</div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Algorithm Educational Explanation Card -->
+        <div class="card info-card" id="kociembaInfoCard" style="display:none">
+          <div class="card-header">
+            <div class="card-title">🎓 Herbert Kociemba's Two-Phase Algorithm</div>
+          </div>
+          <div class="info-body">
+            <div class="info-section">
+              <h5>Phase 1 — Subgroup G1 (Orientation)</h5>
+              <p>Warp and search coordinates to orient all corners, all edges, and place middle-layer edges into their home slice. The search is optimized via precomputed <strong>Slice-Flip</strong> and <strong>Slice-Twist</strong> pruning databases.</p>
+            </div>
+            <div class="info-section">
+              <h5>Phase 2 — Solved Subgroup (Permutation)</h5>
+              <p>Once subgroup G1 is reached, only 90-degree moves of U and D, and 180-degree moves of R, F, L, and B are allowed. The solver then cycles and permutes the pieces to the final solved state.</p>
+            </div>
+          </div>
         </div>
 
         <!-- Solution steps card (hidden until solution generated) -->

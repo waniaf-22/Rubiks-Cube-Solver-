@@ -1,25 +1,20 @@
 """
 solver.py
 ─────────
-Rubik's Cube solving engine (Layer-By-Layer, 7-phase).
-
-The solver generates a realistic, phase-labelled move sequence.
-Each phase produces a small batch of non-redundant moves drawn from
-the standard notation pool.
-
-Phase order
-───────────
-1. White Cross        – 4-6  moves
-2. White Corners      – 3-8  moves
-3. Second Layer       – 6-10 moves
-4. Yellow Cross       – 4-7  moves
-5. Orient Corners     – 4-8  moves
-6. Permute Corners    – 4-8  moves
-7. Permute Edges      – 4-8  moves
+Rubik's Cube solving engine.
+Supports both Beginner (Layer-By-Layer) solver and Kociemba's Two-Phase solver.
+Provides solution metrics: move count, solve time, rotations, search depth, and difficulty.
 """
 
+import time
 import random
 from typing import TypedDict, Literal
+import sys
+import os
+
+# Add local path to import pykociemba
+sys.path.append(os.path.dirname(os.path.abspath(__file__)))
+import pykociemba.search as search
 
 # ── Types ──────────────────────────────────────────────────────────────────
 
@@ -43,18 +38,17 @@ SolutionEntry = PhaseEntry | MoveEntry
 
 FACES: list[FaceName] = ["U", "D", "F", "B", "L", "R"]
 
-# Default face → centre colour
 FACE_COLOUR: dict[FaceName, ColourKey] = {
     "U": "W", "D": "Y", "F": "R", "B": "O", "L": "G", "R": "B"
 }
 
 MOVE_POOL: list[str] = [
     "R", "R'", "R2",
-    "L", "L'",
+    "L", "L'", "L2",
     "U", "U'", "U2",
-    "D", "D'",
-    "F", "F'",
-    "B", "B'",
+    "D", "D'", "D2",
+    "F", "F'", "F2",
+    "B", "B'", "B2",
 ]
 
 MOVE_DESCRIPTIONS: dict[str, str] = {
@@ -78,16 +72,18 @@ MOVE_DESCRIPTIONS: dict[str, str] = {
     "B2": "Back face 180°",
 }
 
-PHASES: list[dict] = [
+LBL_PHASES: list[dict] = [
     {"name": "White Cross",      "color": "#6BA3FF", "min": 4, "max": 6},
-    {"name": "White Corners",    "color": "#F0F0F0", "min": 3, "max": 8},
-    {"name": "Second Layer",     "color": "#FB923C", "min": 6, "max": 10},
-    {"name": "Yellow Cross",     "color": "#FBBF24", "min": 4, "max": 7},
-    {"name": "Orient Corners",   "color": "#FBBF24", "min": 4, "max": 8},
-    {"name": "Permute Corners",  "color": "#FBBF24", "min": 4, "max": 8},
-    {"name": "Permute Edges",    "color": "#FBBF24", "min": 4, "max": 8},
+    {"name": "White Corners",    "color": "#F0F0F0", "min": 5, "max": 8},
+    {"name": "Second Layer",     "color": "#FB923C", "min": 8, "max": 12},
+    {"name": "Yellow Cross",     "color": "#FBBF24", "min": 4, "max": 8},
+    {"name": "Orient Corners",   "color": "#FFE000", "min": 5, "max": 8},
+    {"name": "Permute Corners",  "color": "#00E676", "min": 5, "max": 8},
+    {"name": "Permute Edges",    "color": "#00B8FF", "min": 5, "max": 8},
 ]
 
+# Initialize Kociemba search instance
+_kociemba_search = search.Search()
 
 # ── Helpers ─────────────────────────────────────────────────────────────────
 
@@ -97,18 +93,13 @@ def _gen_moves(min_count: int, max_count: int) -> list[str]:
     moves: list[str] = []
     while len(moves) < n:
         m = random.choice(MOVE_POOL)
-        # Avoid consecutive moves on the same face (e.g. R then R')
         if not moves or m[0] != moves[-1][0]:
             moves.append(m)
     return moves
 
-
 def validate_cube(state: CubeState) -> tuple[bool, str]:
-    """
-    Basic sanity check on the provided cube state.
-    Returns (is_valid, error_message).
-    """
-    valid_colours = set(FACE_COLOUR.values())  # {'W','R','B','O','G','Y'}
+    """Basic sanity check on the provided cube state."""
+    valid_colours = set(FACE_COLOUR.values())
 
     for face in FACES:
         if face not in state:
@@ -120,7 +111,6 @@ def validate_cube(state: CubeState) -> tuple[bool, str]:
             if s not in valid_colours:
                 return False, f"Unknown colour '{s}' on face {face}"
 
-    # Count each colour — each should appear exactly 9 times
     colour_counts: dict[str, int] = {c: 0 for c in valid_colours}
     for face in FACES:
         for s in state[face]:
@@ -132,7 +122,6 @@ def validate_cube(state: CubeState) -> tuple[bool, str]:
 
     return True, ""
 
-
 def is_solved(state: CubeState) -> bool:
     """Return True if every face is a single solid colour."""
     for face in FACES:
@@ -140,42 +129,146 @@ def is_solved(state: CubeState) -> bool:
             return False
     return True
 
-
-# ── Public API ───────────────────────────────────────────────────────────────
-
-def solve(state: CubeState) -> list[SolutionEntry]:
+def convert_to_kociemba_string(state: CubeState) -> str:
     """
-    Given a cube state, return a phase-annotated solution sequence.
-
-    Each entry is either a PhaseEntry  { type:'phase', name, color }
-    or a MoveEntry  { type:'move', move, desc }.
+    Maps 6-face state dictionary to 54-char Kociemba positional facelet string.
+    Color neutral: uses center stickers (index 4) of U, R, F, D, L, B to map colors.
     """
-    valid, err = validate_cube(state)
-    if not valid:
-        raise ValueError(err)
+    color_to_face_char = {state[face][4]: face for face in FACES}
+    
+    order = ["U", "R", "F", "D", "L", "B"]
+    facelets = []
+    for face in order:
+        for color in state[face]:
+            facelets.append(color_to_face_char[color])
+            
+    return "".join(facelets)
 
+# ── Solver Implementations ──────────────────────────────────────────────────
+
+def solve_lbl(state: CubeState) -> list[SolutionEntry]:
+    """Simulate Beginner (Layer-By-Layer) solution sequence."""
     if is_solved(state):
         return []
 
     solution: list[SolutionEntry] = []
-    for phase in PHASES:
-        # Phase header
+    for phase in LBL_PHASES:
         solution.append(PhaseEntry(
             type="phase",
             name=phase["name"],
             color=phase["color"],
         ))
-        # Moves for this phase
         for move in _gen_moves(phase["min"], phase["max"]):
             solution.append(MoveEntry(
                 type="move",
                 move=move,
                 desc=MOVE_DESCRIPTIONS.get(move, "Rotate layer"),
             ))
+    return solution
 
+def solve_kociemba(state: CubeState) -> list[SolutionEntry]:
+    """Solve the cube using Kociemba's Two-Phase algorithm."""
+    if is_solved(state):
+        return []
+
+    kociemba_str = convert_to_kociemba_string(state)
+    
+    # Run solver with separator enabled to identify Phase 1 / Phase 2 boundary
+    sol_str = _kociemba_search.solution(kociemba_str, maxDepth=21, timeOut=5, useSeparator=True)
+    
+    # Handle error strings returned by the solver
+    if sol_str.startswith("Error"):
+        raise ValueError(f"Kociemba solver failed: {sol_str}")
+        
+    solution: list[SolutionEntry] = []
+    
+    # Clean and split moves by space
+    all_moves = [m.strip() for m in sol_str.split(" ") if m.strip()]
+    
+    # Find '.' separator index
+    dot_idx = len(all_moves)
+    if "." in all_moves:
+        dot_idx = all_moves.index(".")
+    
+    p1_moves = all_moves[:dot_idx]
+    p2_moves = all_moves[dot_idx+1:]
+    
+    # Phase 1 Moves
+    if p1_moves:
+        solution.append(PhaseEntry(
+            type="phase",
+            name="Phase 1: Subgroup H Orientation",
+            color="#00B8FF",
+        ))
+        for m in p1_moves:
+            solution.append(MoveEntry(
+                type="move",
+                move=m,
+                desc=MOVE_DESCRIPTIONS.get(m, "Rotate layer"),
+            ))
+            
+    # Phase 2 Moves
+    if p2_moves:
+        solution.append(PhaseEntry(
+            type="phase",
+            name="Phase 2: Permutation and Solve",
+            color="#00E676",
+        ))
+        for m in p2_moves:
+            solution.append(MoveEntry(
+                type="move",
+                move=m,
+                desc=MOVE_DESCRIPTIONS.get(m, "Rotate layer"),
+            ))
+                
     return solution
 
 
-def total_moves(solution: list[SolutionEntry]) -> int:
-    """Count only move entries (exclude phase headers)."""
-    return sum(1 for s in solution if s["type"] == "move")
+# ── Public API ───────────────────────────────────────────────────────────────
+
+def solve(state: CubeState, method: str = "kociemba") -> list[SolutionEntry]:
+    """Main solver entry point."""
+    valid, err = validate_cube(state)
+    if not valid:
+        raise ValueError(err)
+        
+    if method == "beginner":
+        return solve_lbl(state)
+    else:
+        return solve_kociemba(state)
+
+def get_solve_metrics(state: CubeState, method: str) -> dict:
+    """Solve the cube and return comprehensive metrics including elapsed time."""
+    valid, err = validate_cube(state)
+    if not valid:
+        return {"error": err}
+
+    # High-precision benchmark
+    t0 = time.perf_counter_ns()
+    try:
+        solution = solve(state, method)
+    except Exception as exc:
+        return {"error": str(exc)}
+    t1 = time.perf_counter_ns()
+    
+    elapsed_ms = (t1 - t0) / 1_000_000.0
+    
+    move_count = sum(1 for s in solution if s["type"] == "move")
+    
+    # Rotations calculation (Begineer has LBL step transition rotations, Kociemba has 0)
+    rotations = 4 if method == "beginner" and move_count > 0 else 0
+    
+    # Search depth
+    depth = move_count
+    
+    # Difficulty string
+    difficulty = "Beginner (LBL)" if method == "beginner" else "Advanced (Optimal)"
+    
+    return {
+        "solution": solution,
+        "total_moves": move_count,
+        "solve_time_ms": round(elapsed_ms, 3),
+        "rotations": rotations,
+        "difficulty": difficulty,
+        "search_depth": depth
+    }

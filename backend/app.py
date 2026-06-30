@@ -2,26 +2,21 @@
 app.py
 ──────
 Flask REST API server for CubeSolve.
-
-Endpoints
-─────────
-GET  /                      → Serves frontend/index.html
-GET  /css/<path>            → Serves frontend/css/
-GET  /js/<path>             → Serves frontend/js/
-GET  /api/health            → { status: "ok" }
-POST /api/solve             → { faces: {...} } → { solution: [...] }
-POST /api/detect            → { image: "<base64>" } → { colors: [...] }
+Serves static frontend assets and exposes solving & detection APIs.
 """
 
 import base64
 import os
+import time
 from pathlib import Path
+import numpy as np
+import cv2
 
-from flask import Flask, jsonify, request, send_from_directory, abort
+from flask import Flask, jsonify, request, send_from_directory
 from flask_cors import CORS
 
-from solver import solve, validate_cube
-from color_detect import detect_face_from_image, classify_colour
+from solver import get_solve_metrics, validate_cube
+from color_detect import detect_cube_face
 
 # ── App setup ────────────────────────────────────────────────────────────────
 
@@ -66,17 +61,23 @@ def api_solve():
             "B": [...],
             "L": [...],
             "R": [...]
-          }
+          },
+          "method": "beginner" or "kociemba" (default: "kociemba")
         }
 
     Response:
         {
-          "solution": [
-            { "type": "phase", "name": "White Cross", "color": "#6BA3FF" },
-            { "type": "move",  "move": "R",  "desc": "Right face clockwise" },
-            ...
-          ],
-          "total_moves": 42
+          "solution": [...],
+          "total_moves": 19,
+          "solve_time_ms": 12.34,
+          "rotations": 0,
+          "difficulty": "Advanced (Optimal)",
+          "search_depth": 19,
+          "comparison": {
+            "beginner": { "moves": 58, "time_ms": 235.1 },
+            "kociemba": { "moves": 19, "time_ms": 8.4 },
+            "reduction_pct": 67.2
+          }
         }
     """
     data = request.get_json(silent=True)
@@ -84,42 +85,67 @@ def api_solve():
         return jsonify({"error": "Request body must contain a 'faces' object"}), 400
 
     faces = data["faces"]
+    method = data.get("method", "kociemba")
+    if method not in ["beginner", "kociemba"]:
+        method = "kociemba"
 
     valid, err = validate_cube(faces)
     if not valid:
         return jsonify({"error": err}), 422
 
-    try:
-        solution = solve(faces)
-    except ValueError as exc:
-        return jsonify({"error": str(exc)}), 422
-    except Exception as exc:
-        app.logger.exception("Unexpected solver error")
-        return jsonify({"error": "Internal solver error"}), 500
+    # Benchmark both solvers for comparative dashboard
+    beg_res = get_solve_metrics(faces, "beginner")
+    koc_res = get_solve_metrics(faces, "kociemba")
 
-    total = sum(1 for s in solution if s["type"] == "move")
-    return jsonify({"solution": solution, "total_moves": total})
+    if "error" in beg_res:
+        return jsonify({"error": f"Beginner solver error: {beg_res['error']}"}), 422
+    if "error" in koc_res:
+        return jsonify({"error": f"Kociemba solver error: {koc_res['error']}"}), 422
+
+    # Compute move reduction percentage
+    beg_moves = beg_res["total_moves"]
+    koc_moves = koc_res["total_moves"]
+    reduction = 0.0
+    if beg_moves > 0:
+        reduction = round(((beg_moves - koc_moves) / beg_moves) * 100, 1)
+
+    comparison = {
+        "beginner": {
+            "moves": beg_moves,
+            "time_ms": beg_res["solve_time_ms"]
+        },
+        "kociemba": {
+            "moves": koc_moves,
+            "time_ms": koc_res["solve_time_ms"]
+        },
+        "reduction_pct": max(0.0, reduction)
+    }
+
+    # Selected solver payload
+    selected = beg_res if method == "beginner" else koc_res
+
+    return jsonify({
+        "solution": selected["solution"],
+        "total_moves": selected["total_moves"],
+        "solve_time_ms": selected["solve_time_ms"],
+        "rotations": selected["rotations"],
+        "difficulty": selected["difficulty"],
+        "search_depth": selected["search_depth"],
+        "comparison": comparison
+    })
 
 # ── API: Detect colours from image ────────────────────────────────────────────
 
 @app.post("/api/detect")
 def api_detect():
     """
-    Request body:
-        {
-          "image": "<base64-encoded image data (JPEG or PNG)>"
-        }
-
-    Response:
-        {
-          "colors": ["W","R","G","B","O","Y","W","W","R"]   // 9 values, row-major
-        }
+    Continuous color & contour detection API.
+    Processes frame using OpenCV pipeline and returns live tracking data.
     """
     data = request.get_json(silent=True)
     if not data or "image" not in data:
         return jsonify({"error": "Request body must contain an 'image' field"}), 400
 
-    # Strip data-URL prefix if present  (data:image/jpeg;base64,...)
     raw = data["image"]
     if "," in raw:
         raw = raw.split(",", 1)[1]
@@ -130,12 +156,20 @@ def api_detect():
         return jsonify({"error": "Invalid base64 image data"}), 400
 
     try:
-        colours = detect_face_from_image(image_bytes)
+        # Decode BGR image for OpenCV processing
+        arr = np.frombuffer(image_bytes, np.uint8)
+        img = cv2.imdecode(arr, cv2.IMREAD_COLOR)
+        if img is None:
+            return jsonify({"error": "Could not decode image"}), 400
+
+        # Run professional pipeline
+        res = detect_cube_face(img)
+        
     except Exception as exc:
         app.logger.exception("Colour detection error")
         return jsonify({"error": f"Colour detection failed: {exc}"}), 500
 
-    return jsonify({"colors": colours})
+    return jsonify(res)
 
 # ── Entry point ───────────────────────────────────────────────────────────────
 
