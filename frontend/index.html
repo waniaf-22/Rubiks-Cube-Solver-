@@ -1,0 +1,295 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>CubeSolve — AI Powered Rubik's Cube Solver</title>
+  <meta name="description" content="Point your camera at each face of your Rubik's Cube. Our AI reads the colors and generates the fastest path to solved — move by move, in real time.">
+
+  <!-- Fonts -->
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&family=Space+Grotesk:wght@400;500;600;700&display=swap" rel="stylesheet">
+
+  <!-- Styles -->
+  <link rel="stylesheet" href="/css/style.css">
+</head>
+<body>
+
+<!-- ── NAV ── -->
+<nav>
+  <div class="nav-logo">
+    <div class="nav-logo-dot"></div>
+    CubeSolve
+  </div>
+  <div class="nav-links">
+    <button class="nav-link" onclick="document.getElementById('hero').scrollIntoView({behavior:'smooth'})">Home</button>
+    <button class="nav-link" onclick="document.getElementById('solver').scrollIntoView({behavior:'smooth'})">Solver</button>
+    <button class="nav-link" onclick="document.getElementById('learn').scrollIntoView({behavior:'smooth'})">Learn</button>
+    <button class="nav-link" onclick="document.getElementById('tips').scrollIntoView({behavior:'smooth'})">Tips</button>
+  </div>
+  <button class="nav-cta" onclick="document.getElementById('solver').scrollIntoView({behavior:'smooth'})">Open Solver →</button>
+</nav>
+
+<!-- ── MOVE FLASH OVERLAY ── -->
+<div id="moveFlash" aria-live="polite">
+  <div class="flash-move" id="flashMove"></div>
+  <div class="flash-desc" id="flashDesc"></div>
+</div>
+
+<!-- ══════════════════════════ SECTION 1: HERO ══════════════════════════ -->
+<section id="hero">
+  <div class="grid-bg"></div>
+  <div class="radial-glow" style="width:700px;height:700px;top:-200px;right:-100px;opacity:0.5"></div>
+
+  <div class="hero-inner">
+    <!-- Copy -->
+    <div>
+      <div class="hero-eyebrow">
+        <div class="eyebrow-pulse"></div>
+        AI · Camera Vision · Step-by-Step
+      </div>
+      <h1 class="hero-h1">
+        Solve any<br>Rubik's Cube<br><em>in seconds.</em>
+      </h1>
+      <p class="hero-sub">
+        Point your camera at each face of your cube. Our AI reads the colors
+        and generates the fastest path to solved — move by move, in real time.
+      </p>
+      <div class="hero-actions">
+        <button class="btn-primary" onclick="document.getElementById('solver').scrollIntoView({behavior:'smooth'})">Start Solving →</button>
+        <button class="btn-ghost"   onclick="document.getElementById('learn').scrollIntoView({behavior:'smooth'})">Learn to Solve</button>
+      </div>
+      <div class="hero-stats">
+        <div><div class="hero-stat-num">43Q</div><div class="hero-stat-label">Possible combos</div></div>
+        <div><div class="hero-stat-num">20</div><div class="hero-stat-label">Max moves needed</div></div>
+        <div><div class="hero-stat-num">3.47s</div><div class="hero-stat-label">World record</div></div>
+        <div><div class="hero-stat-num">Free</div><div class="hero-stat-label">No login needed</div></div>
+      </div>
+    </div>
+
+    <!-- 3D CSS Cube -->
+    <div class="cube-wrapper">
+      <div class="cube-scene" id="heroCubeScene">
+        <div class="cube-3d floating" id="heroCube">
+          <div class="cface f-front"  id="hcf-front"></div>
+          <div class="cface f-back"   id="hcf-back"></div>
+          <div class="cface f-left"   id="hcf-left"></div>
+          <div class="cface f-right"  id="hcf-right"></div>
+          <div class="cface f-top"    id="hcf-top"></div>
+          <div class="cface f-bottom" id="hcf-bottom"></div>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ══════════════════════════ SECTION 2: SOLVER ══════════════════════════ -->
+<section id="solver">
+  <div class="grid-bg"></div>
+  <div class="solver-inner">
+
+    <div class="solver-top">
+      <div>
+        <div class="section-label">// SOLVER</div>
+        <div class="section-title">Scan your cube</div>
+      </div>
+      <button class="btn-ghost" onclick="window.__resetAll()" style="font-size:0.8rem;padding:0.5rem 1rem">↺ Reset</button>
+    </div>
+
+    <div class="solver-layout">
+
+      <!-- ── Camera + paint column ── -->
+      <div style="display:flex;flex-direction:column;gap:1rem">
+
+        <!-- Camera card -->
+        <div class="card">
+          <div class="card-header">
+            <div class="card-title">📷 Camera Feed</div>
+            <div class="status-pill" id="camPill">
+              <div class="status-dot"></div>
+              <span id="camPillText">Off</span>
+            </div>
+          </div>
+
+          <div class="cam-body">
+            <video id="vidEl" autoplay muted playsinline></video>
+            <canvas id="cvEl" style="display:none"></canvas>
+
+            <!-- Scan overlay (shown when camera is live) -->
+            <div class="scan-overlay" id="scanOverlay">
+              <div class="scan-corner tl"></div>
+              <div class="scan-corner tr"></div>
+              <div class="scan-corner bl"></div>
+              <div class="scan-corner br"></div>
+              <div class="scan-reticle">
+                <span class="scan-reticle-label">ALIGN FACE</span>
+              </div>
+              <div class="scan-sweep"></div>
+            </div>
+
+            <!-- Placeholder (before camera starts) -->
+            <div class="cam-empty" id="camEmpty">
+              <div class="cam-empty-icon">📷</div>
+              <p>Camera not started. Click <strong>Start Camera</strong> or use manual input below.</p>
+            </div>
+          </div>
+
+          <div class="cam-footer">
+            <button class="ibtn ibtn-blue"  id="btnStart" onclick="window.__startCam()">Start Camera</button>
+            <button class="ibtn ibtn-ghost" id="btnCap"   onclick="window.__captureFace()" disabled>Capture Face</button>
+            <button class="ibtn ibtn-ghost"               onclick="window.__loadDemo()">Demo</button>
+            <span class="cam-hint" id="camHint">Ready</span>
+          </div>
+
+          <!-- Face progress tabs -->
+          <div class="face-tabs-row">
+            <div class="face-tabs-label">Faces scanned</div>
+            <div class="face-tabs" id="faceTabs"></div>
+          </div>
+
+          <!-- Status alerts -->
+          <div class="alert-strip alert-success" id="aOk">✓ Face captured — move to next face</div>
+          <div class="alert-strip alert-info"    id="aAll">🎉 All 6 faces scanned — generate solution!</div>
+          <div class="alert-strip alert-warn"    id="aWarn">⚠ Scan all 6 faces first</div>
+          <div class="alert-strip alert-error"   id="aError">✕ Detection error — try manual input</div>
+        </div>
+
+        <!-- Manual paint card -->
+        <div class="card">
+          <div class="card-header">
+            <div class="card-title">🎨 Manual Color Input</div>
+            <span style="font-size:0.75rem;color:var(--white-25)">Click stickers to paint</span>
+          </div>
+          <div class="paint-row">
+            <div>
+              <div class="paint-label">Color</div>
+              <div class="color-swatches" id="swatches"></div>
+            </div>
+            <div>
+              <div class="paint-label">Face grid</div>
+              <div class="paint-grid" id="paintGrid"></div>
+            </div>
+            <div style="display:flex;flex-direction:column;gap:0.5rem;justify-content:flex-end">
+              <button class="ibtn ibtn-blue" onclick="window.__saveManual()">Save Face</button>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- ── Sidebar ── -->
+      <div class="sidebar">
+
+        <!-- Cube net / state card -->
+        <div class="card cube-net-card">
+          <div class="cube-net-header">
+            <div class="cube-net-title">Cube State</div>
+            <button class="ibtn ibtn-ghost ibtn-xs" onclick="window.__resetAll()">Reset</button>
+          </div>
+          <div class="net-grid" id="netGrid"></div>
+          <button class="ibtn ibtn-blue"
+                  style="width:100%;margin-top:1rem;padding:0.6rem"
+                  onclick="window.__generateSolution()">
+            ⚡ Generate Solution
+          </button>
+        </div>
+
+        <!-- Solution steps card (hidden until solution generated) -->
+        <div class="card solution-card" id="solCard" style="display:none">
+          <div class="progress-wrap">
+            <div class="progress-row">
+              <span class="progress-text">Solution progress</span>
+              <span class="progress-pct" id="pPct">0%</span>
+            </div>
+            <div class="progress-track">
+              <div class="progress-bar" id="pBar" style="width:0%"></div>
+            </div>
+          </div>
+          <div class="step-nav">
+            <button class="ibtn ibtn-ghost" onclick="window.__prevStep()">← Prev</button>
+            <button class="ibtn ibtn-blue"  onclick="window.__nextStep()">Next →</button>
+          </div>
+          <div class="sol-steps" id="solSteps"></div>
+        </div>
+
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ══════════════════════════ SECTION 3: LEARN ══════════════════════════ -->
+<section id="learn">
+  <div class="grid-bg"></div>
+  <div class="learn-inner">
+    <div>
+      <div class="section-label">// LEARNING CENTER</div>
+      <div class="section-title">Master the cube</div>
+    </div>
+    <div class="method-pills" id="methodPills"></div>
+    <div class="learn-body">
+      <div class="steps-nav"        id="stepsNav"></div>
+      <div class="learn-content-card" id="learnContent"></div>
+    </div>
+  </div>
+</section>
+
+<!-- ══════════════════════════ SECTION 4: TIPS ══════════════════════════ -->
+<section id="tips">
+  <div class="grid-bg"></div>
+  <div class="tips-inner">
+    <div>
+      <div class="section-label">// PRO TIPS &amp; RECORDS</div>
+      <div class="section-title">Go faster. Go further.</div>
+    </div>
+
+    <div class="stats-row">
+      <div class="stat-box"><div class="stat-box-num">43Q</div><div class="stat-box-label">Possible cube states</div></div>
+      <div class="stat-box"><div class="stat-box-num">20</div><div class="stat-box-label">God's Number (max moves)</div></div>
+      <div class="stat-box"><div class="stat-box-num">3.47s</div><div class="stat-box-label">WCA World Record (Max Park)</div></div>
+      <div class="stat-box"><div class="stat-box-num">~50</div><div class="stat-box-label">Avg beginner solve moves</div></div>
+    </div>
+
+    <div class="tips-grid">
+      <div class="tip-card">
+        <div class="tip-card-tag">Technique</div>
+        <h4>Look Ahead</h4>
+        <p>While executing one step, identify your next piece. Top cubers plan 3–4 moves ahead so there's zero hesitation between steps.</p>
+      </div>
+      <div class="tip-card">
+        <div class="tip-card-tag">Hands</div>
+        <h4>Finger Tricks</h4>
+        <p>Master the R-U flick: right index pushes R up, same finger flicks U clockwise. Practice R U R' U' until it's a single fluid motion.</p>
+      </div>
+      <div class="tip-card">
+        <div class="tip-card-tag">Efficiency</div>
+        <h4>Minimize Regrips</h4>
+        <p>Every regrip costs ~0.3s. Plan your entire grip for algorithm sequences so your hands never need to stop and reposition.</p>
+      </div>
+      <div class="tip-card">
+        <div class="tip-card-tag">Practice</div>
+        <h4>Slow is Smooth</h4>
+        <p>Practice algorithms at 50% speed with zero mistakes. Accuracy builds better muscle memory than rushing. Speed follows naturally.</p>
+      </div>
+      <div class="tip-card">
+        <div class="tip-card-tag">Hardware</div>
+        <h4>Tune Your Cube</h4>
+        <p>Lubricate with silicone spray and adjust spring tension. A well-tuned magnetic speed cube cuts seconds off your time effortlessly.</p>
+      </div>
+      <div class="tip-card">
+        <div class="tip-card-tag">Memory</div>
+        <h4>Blindfold Algs</h4>
+        <p>Practice algorithms with eyes closed. When your hands know every move by feel, your eyes are completely free to plan what's next.</p>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ── FOOTER ── -->
+<footer>
+  <div class="footer-logo">CubeSolve</div>
+  <div class="footer-copy">43,252,003,274,489,856,000 possibilities. Let's solve yours.</div>
+</footer>
+
+<!-- ── JS (ES Modules) ── -->
+<script type="module" src="/js/app.js"></script>
+
+</body>
+</html>

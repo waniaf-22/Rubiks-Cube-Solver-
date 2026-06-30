@@ -1,11 +1,40 @@
 # 🧊 CubeSolve — AI-Powered Rubik's Cube Solver
 
-> Point your camera at each face. Get the fastest path to solved — move by move, in real time.
+> Full-stack web application: **Python (Flask) backend** + **HTML/CSS/JavaScript frontend**
 
-![CubeSolve Banner](https://img.shields.io/badge/CubeSolve-AI%20Powered-4F8EF7?style=for-the-badge&logo=cube&logoColor=white)
-![HTML](https://img.shields.io/badge/Built%20With-HTML%20%2F%20CSS%20%2F%20JS-orange?style=for-the-badge)
-![No Dependencies](https://img.shields.io/badge/Dependencies-None-brightgreen?style=for-the-badge)
+![Python](https://img.shields.io/badge/Backend-Python%20%2F%20Flask-3776AB?style=for-the-badge&logo=python&logoColor=white)
+![JavaScript](https://img.shields.io/badge/Frontend-HTML%20%2F%20CSS%20%2F%20JS-F7DF1E?style=for-the-badge&logo=javascript&logoColor=black)
 ![License](https://img.shields.io/badge/License-MIT-blue?style=for-the-badge)
+
+---
+
+## 🏗️ Project Structure
+
+```
+Rubiks-Cube-Solver-/
+│
+├── backend/                     ← Python / Flask
+│   ├── app.py                   # REST API server (Flask)
+│   ├── solver.py                # 7-phase LBL solving algorithm
+│   ├── color_detect.py          # RGB colour classification (Pillow)
+│   ├── requirements.txt         # Python dependencies
+│   └── .env.example             # Environment variables template
+│
+├── frontend/                    ← Pure HTML / CSS / JavaScript
+│   ├── index.html               # App shell (semantic HTML only)
+│   ├── css/
+│   │   └── style.css            # All styles
+│   └── js/
+│       ├── app.js               # Entry point — API calls, solution rendering
+│       ├── cube.js              # 3D CSS hero cube + drag-rotate
+│       ├── camera.js            # Webcam stream + face capture
+│       ├── painter.js           # Manual paint grid, swatches, cube net
+│       └── learn.js             # Learning Center (LBL / CFOP / Notation)
+│
+├── rubiks-cube-solver.html      # Legacy single-file version (kept for reference)
+├── .gitignore
+└── README.md
+```
 
 ---
 
@@ -13,159 +42,181 @@
 
 | Feature | Description |
 |---|---|
-| 📷 **Camera Scanning** | Use your device camera to scan all 6 faces — AI reads each color automatically |
-| 🎨 **Manual Color Input** | Click-to-paint grid for entering cube state without a camera |
-| ⚡ **Step-by-Step Solution** | Generates a complete move sequence using a layered solving algorithm |
-| 📖 **Learning Center** | Built-in tutorials for Beginner Layer-By-Layer and CFOP methods |
-| 💡 **Pro Tips** | Finger tricks, look-ahead techniques, hardware tuning guides |
-| 🎲 **Demo Mode** | Load a pre-scrambled cube instantly to try the solver |
-| 🌐 **Zero Dependencies** | Pure HTML + CSS + JavaScript — no libraries, no install, no login |
+| 📷 **Camera Scanning** | Captures each face via webcam; backend classifies colours via Pillow |
+| 🎨 **Manual Color Input** | Click-to-paint grid when no camera is available |
+| ⚡ **Flask REST API** | `/api/solve`, `/api/detect`, `/api/health` endpoints |
+| 🧠 **Python Solver** | 7-phase LBL algorithm in `solver.py` with full validation |
+| 🎨 **Colour Detection** | Euclidean RGB distance classifier in `color_detect.py` |
+| 📖 **Learning Center** | Beginner LBL + CFOP + Notation guides (built into frontend) |
+| 💡 **Pro Tips** | Speed techniques, hardware tuning, muscle memory guides |
+| 🌐 **Zero Frontend Deps** | Vanilla HTML/CSS/JS ES Modules — no npm, no bundler |
 
 ---
 
 ## 🚀 Getting Started
 
-### Option 1 — Open Directly
-Just open `rubiks-cube-solver.html` in any modern browser. No server needed.
+### Prerequisites
+- Python 3.10+
+- pip
+
+### 1. Clone the repo
 
 ```bash
-# Clone the repo
 git clone https://github.com/waniaf-22/Rubiks-Cube-Solver-.git
 cd Rubiks-Cube-Solver-
-
-# Open in browser (Windows)
-start rubiks-cube-solver.html
-
-# Open in browser (macOS/Linux)
-open rubiks-cube-solver.html
 ```
 
-### Option 2 — Live Server (optional)
-If you prefer a local server (e.g. for camera access over localhost):
+### 2. Set up the backend
 
 ```bash
-# Using VS Code Live Server extension, or:
-npx serve .
+cd backend
+
+# Create a virtual environment (recommended)
+python -m venv venv
+venv\Scripts\activate        # Windows
+# source venv/bin/activate   # macOS / Linux
+
+# Install dependencies
+pip install -r requirements.txt
 ```
 
-> **Note:** Camera scanning requires HTTPS or `localhost`. If you open the file directly (`file://`), use Manual Color Input instead.
+### 3. Run the server
+
+```bash
+python app.py
+```
+
+The app is now live at **http://localhost:5000** 🎉
+
+Flask serves both the API **and** the frontend — no separate server needed.
 
 ---
 
-## 🕹️ How to Use
+## 🔌 API Reference
 
-### Method A — Camera Scan
-1. Click **Start Camera** and allow browser camera access
-2. Hold each face of your Rubik's Cube in front of the camera
-3. Align it within the scan guide box, then click **Capture Face**
-4. Repeat for all **6 faces** (Top, Bottom, Front, Back, Left, Right)
-5. Click **⚡ Generate Solution**
-6. Follow the move-by-move steps shown in the sidebar
+### `GET /api/health`
+```json
+{ "status": "ok", "version": "1.0.0" }
+```
 
-### Method B — Manual Input
-1. Select a color from the swatch palette
-2. Click the stickers on the **Face Grid** to paint each cell
-3. Click **Save Face** when done
-4. Repeat for all 6 faces, then click **⚡ Generate Solution**
+---
 
-### Method C — Demo Mode
-Click the **Demo** button to load a pre-scrambled cube and try the solver instantly.
+### `POST /api/solve`
+
+**Request body:**
+```json
+{
+  "faces": {
+    "U": ["W","W","W","W","W","W","W","W","W"],
+    "D": ["Y","Y","Y","Y","Y","Y","Y","Y","Y"],
+    "F": ["R","R","R","R","R","R","R","R","R"],
+    "B": ["O","O","O","O","O","O","O","O","O"],
+    "L": ["G","G","G","G","G","G","G","G","G"],
+    "R": ["B","B","B","B","B","B","B","B","B"]
+  }
+}
+```
+
+**Response:**
+```json
+{
+  "solution": [
+    { "type": "phase", "name": "White Cross",  "color": "#6BA3FF" },
+    { "type": "move",  "move": "R",   "desc": "Right face clockwise" },
+    { "type": "move",  "move": "U'",  "desc": "Top face counter-clockwise" },
+    ...
+  ],
+  "total_moves": 42
+}
+```
+
+---
+
+### `POST /api/detect`
+
+**Request body:**
+```json
+{ "image": "<base64-encoded JPEG or PNG>" }
+```
+
+**Response:**
+```json
+{ "colors": ["W","R","G","B","O","Y","W","W","R"] }
+```
+Returns 9 colour codes in row-major order (top-left → bottom-right).
 
 ---
 
 ## 🧠 Algorithm Overview
 
-The solver uses a **layered (beginner) solving strategy** broken into phases:
-
 ```
-Phase 1 → White Cross (top layer edges)
-Phase 2 → White Corners (complete top layer)
-Phase 3 → Middle Layer Edges
-Phase 4 → Yellow Cross (bottom layer)
-Phase 5 → Orient Yellow Corners
-Phase 6 → Permute Yellow Corners
-Phase 7 → Permute Yellow Edges → SOLVED ✅
+Phase 1 → White Cross       (4–6  moves)
+Phase 2 → White Corners     (3–8  moves)
+Phase 3 → Second Layer      (6–10 moves)
+Phase 4 → Yellow Cross      (4–7  moves)
+Phase 5 → Orient Corners    (4–8  moves)
+Phase 6 → Permute Corners   (4–8  moves)
+Phase 7 → Permute Edges     (4–8  moves) → SOLVED ✅
 ```
 
-Color detection from the camera is done via **Euclidean distance in RGB space** — each sampled pixel cluster is matched to the nearest of the 6 standard cube colors (White, Red, Blue, Orange, Green, Yellow).
+Cube colour detection uses **Euclidean distance in RGB space** — each pixel cluster is matched to the nearest of the 6 standard cube colours via `color_detect.py`.
 
 ---
 
-## 📖 Learning Center
+## 🕹️ How to Use
 
-CubeSolve includes an interactive **Learning Center** with two solving methods:
+### Method A — Camera
+1. Open **http://localhost:5000**
+2. Click **Start Camera** and allow access
+3. Hold each face within the guide box → **Capture Face**
+4. Repeat for all 6 faces → **⚡ Generate Solution**
+5. Step through moves with **Next →**
 
-- **Beginner (Layer-by-Layer)** — 7 intuitive steps, ideal for first-timers
-- **CFOP (Fridrich Method)** — Cross, F2L, OLL, PLL — the method used by speedcubers
+### Method B — Manual Paint
+1. Select a colour from the swatches
+2. Click stickers on the **Face Grid** to paint
+3. **Save Face** → repeat for all 6 → **Generate Solution**
 
-Each step includes:
-- Plain-English explanation
-- Algorithm notation blocks (e.g. `R U R' U'`)
-- Practical tips and common mistakes
-
----
-
-## 📐 Notation Reference
-
-| Move | Meaning |
-|---|---|
-| `R` | Right face clockwise |
-| `R'` | Right face counter-clockwise |
-| `R2` | Right face 180° |
-| `U` | Top face clockwise |
-| `U'` | Top face counter-clockwise |
-| `F` | Front face clockwise |
-| `F'` | Front face counter-clockwise |
-| `L` | Left face clockwise |
-| `D` | Bottom face clockwise |
-| `B` | Back face clockwise |
+### Method C — Demo
+Click **Demo** to load a pre-scrambled cube instantly.
 
 ---
 
-## 🎯 Cube Facts
+## 📐 Colour Keys
 
-| Stat | Value |
-|---|---|
-| Possible cube states | 43,252,003,274,489,856,000 (~43 quintillion) |
-| God's Number (max optimal moves) | **20** |
-| WCA World Record | **3.47s** — Max Park |
-| Average beginner solve | ~50 moves |
+| Key | Colour | Face |
+|---|---|---|
+| `W` | White | Top (U) |
+| `Y` | Yellow | Bottom (D) |
+| `R` | Red | Front (F) |
+| `O` | Orange | Back (B) |
+| `G` | Green | Left (L) |
+| `B` | Blue | Right (R) |
 
 ---
 
 ## 🛠️ Tech Stack
 
-- **HTML5** — Semantic structure, `<video>` for camera, `<canvas>` for pixel sampling
-- **CSS3** — CSS Grid, 3D transforms (`preserve-3d`), CSS animations, scroll-snap
-- **Vanilla JavaScript** — Camera API (`getUserMedia`), canvas color detection, solving logic
-- **Google Fonts** — Inter + Space Grotesk
-- **No frameworks. No build tools. No dependencies.**
-
----
-
-## 📁 Project Structure
-
-```
-Rubiks-Cube-Solver-/
-│
-└── rubiks-cube-solver.html   # Complete app — all HTML, CSS & JS in one file
-```
+| Layer | Technology |
+|---|---|
+| **Backend** | Python 3, Flask, Flask-CORS, Pillow |
+| **Frontend** | HTML5, CSS3 (Grid, 3D transforms, animations), Vanilla JS (ES Modules) |
+| **Camera** | Web `getUserMedia` API + `<canvas>` pixel sampling |
+| **Fonts** | Google Fonts — Inter + Space Grotesk |
+| **Build** | None — zero bundler, zero npm |
 
 ---
 
 ## 🤝 Contributing
 
-Contributions are welcome! Here are some ideas:
+Ideas for improvement:
+- [ ] Implement Kociemba's algorithm (true optimal solver)
+- [ ] Animated 3D cube that plays back each move
+- [ ] HSV / Lab colour space for better camera detection
+- [ ] Timer + solve history tracking
+- [ ] PWA / offline support
 
-- [ ] Implement a true optimal solver (Kociemba's algorithm)
-- [ ] Add 3D animated cube that visualizes each move
-- [ ] Improve camera color detection accuracy (HSV / Lab color space)
-- [ ] Add timer / solve history tracking
-- [ ] Mobile PWA support
-
-To contribute:
 ```bash
-git fork https://github.com/waniaf-22/Rubiks-Cube-Solver-.git
 git checkout -b feature/your-feature
 git commit -m "Add your feature"
 git push origin feature/your-feature
@@ -176,7 +227,7 @@ git push origin feature/your-feature
 
 ## 📄 License
 
-This project is open-source under the [MIT License](LICENSE).
+MIT — free to use, modify, and distribute.
 
 ---
 
