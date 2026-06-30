@@ -6,8 +6,9 @@
  * raycast sticker painting in 3D, and automatic move playback with speed control.
  */
 
-import * as THREE from 'https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.module.js';
-import { OrbitControls } from 'https://unpkg.com/three@0.128.0/examples/jsm/controls/OrbitControls.js';
+import * as THREE from 'three';
+import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
+
 
 // Configuration
 const CUBIE_GAP = 0.95; // slightly smaller than 1 to create gaps between cubies
