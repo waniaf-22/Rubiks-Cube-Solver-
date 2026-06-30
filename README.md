@@ -1,4 +1,4 @@
-# CubeSolve — AI-Powered Rubik's Cube Solver
+# CubeSolve — Academic Rubik's Cube Solver & CV Scanner
 
 > Full-stack web application: **Python (Flask) backend** + **HTML/CSS/JavaScript frontend**
 
@@ -15,8 +15,9 @@ Rubiks-Cube-Solver-/
 │
 ├── backend/                     ← Python / Flask
 │   ├── app.py                   # REST API server (Flask)
-│   ├── solver.py                # 7-phase LBL solving algorithm
-│   ├── color_detect.py          # RGB colour classification (Pillow)
+│   ├── solver.py                # Dual Solver (LBL + Kociemba Two-Phase)
+│   ├── color_detect.py          # OpenCV CV scanning pipeline
+│   ├── pykociemba/              # Pure Python Two-Phase search engine & lookup tables
 │   ├── requirements.txt         # Python dependencies
 │   └── .env.example             # Environment variables template
 │
@@ -25,9 +26,9 @@ Rubiks-Cube-Solver-/
 │   ├── css/
 │   │   └── style.css            # All styles
 │   └── js/
-│       ├── app.js               # Entry point — API calls, solution rendering
+│       ├── app.js               # Entry point — API calls, metrics rendering
 │       ├── cube.js              # 3D CSS hero cube + drag-rotate
-│       ├── camera.js            # Webcam stream + face capture
+│       ├── camera.js            # Webcam stream + live overlays + auto-capture
 │       ├── painter.js           # Manual paint grid, swatches, cube net
 │       └── learn.js             # Learning Center (LBL / CFOP / Notation)
 │
@@ -41,14 +42,15 @@ Rubiks-Cube-Solver-/
 
 | Feature | Description |
 |---|---|
-| Camera Scanning | Captures each face via webcam; backend classifies colours via Pillow |
-| Manual Color Input | Click-to-paint grid when no camera is available |
-| Flask REST API | `/api/solve`, `/api/detect`, `/api/health` endpoints |
-| Python Solver | 7-phase LBL algorithm in `solver.py` with full validation |
-| Colour Detection | Euclidean RGB distance classifier in `color_detect.py` |
-| Learning Center | Beginner LBL + CFOP + Notation guides (built into frontend) |
-| Pro Tips | Speed techniques, hardware tuning, muscle memory guides |
-| Zero Frontend Deps | Vanilla HTML/CSS/JS ES Modules — no npm, no bundler |
+| OpenCV Scanner | Contours, polygon approximation, and perspective transformation to warp and isolate the cube face |
+| Auto-Capture | Automatic capture once the cube is aligned and remains stable for 1.0 second with >95% confidence |
+| HSV Classification | Robust color detection in HSV space, with gray-world white balance and blur rejection |
+| Dual Solving Engine | Support for both Beginner (LBL) and Kociemba Two-Phase (near-optimal) algorithms |
+| Performance Stats | Live metrics tracking: solution length, solve time (ms), rotations, search depth, difficulty |
+| Solver Comparison | Dashboard illustrating move count, solve time, and percentage reduction between solvers |
+| Phase Explanation | Educational breakdown describing Kociemba's Phase 1 (orientation) and Phase 2 (permutation) |
+| Flask REST API | `/api/solve`, `/api/detect`, and `/api/health` endpoints |
+| Zero Frontend Deps | Vanilla HTML/CSS/JS ES Modules — no npm, no bundlers |
 
 ---
 
@@ -108,11 +110,12 @@ Flask serves both the API and the frontend — no separate server needed.
   "faces": {
     "U": ["W","W","W","W","W","W","W","W","W"],
     "D": ["Y","Y","Y","Y","Y","Y","Y","Y","Y"],
-    "F": ["R","R","R","R","R","R","R","R","R"],
-    "B": ["O","O","O","O","O","O","O","O","O"],
-    "L": ["G","G","G","G","G","G","G","G","G"],
-    "R": ["B","B","B","B","B","B","B","B","B"]
-  }
+    "F": ["B","B","B","R","R","R","R","R","R"],
+    "R": ["O","O","O","B","B","B","B","B","B"],
+    "B": ["G","G","G","O","O","O","O","O","O"],
+    "L": ["R","R","R","G","G","G","G","G","G"]
+  },
+  "method": "kociemba"
 }
 ```
 
@@ -120,12 +123,19 @@ Flask serves both the API and the frontend — no separate server needed.
 ```json
 {
   "solution": [
-    { "type": "phase", "name": "White Cross", "color": "#6BA3FF" },
-    { "type": "move",  "move": "R",  "desc": "Right face clockwise" },
-    { "type": "move",  "move": "U'", "desc": "Top face counter-clockwise" },
-    ...
+    { "type": "phase", "name": "Phase 1: Subgroup H Orientation", "color": "#00B8FF" },
+    { "type": "move",  "move": "U'", "desc": "Top face counter-clockwise" }
   ],
-  "total_moves": 42
+  "total_moves": 1,
+  "solve_time_ms": 0.544,
+  "rotations": 0,
+  "difficulty": "Advanced (Optimal)",
+  "search_depth": 1,
+  "comparison": {
+    "beginner": { "moves": 47, "time_ms": 0.239 },
+    "kociemba": { "moves": 1, "time_ms": 0.544 },
+    "reduction_pct": 97.9
+  }
 }
 ```
 
@@ -140,57 +150,37 @@ Flask serves both the API and the frontend — no separate server needed.
 
 **Response:**
 ```json
-{ "colors": ["W","R","G","B","O","Y","W","W","R"] }
+{
+  "detected": true,
+  "colors": ["W","R","G","B","O","Y","W","W","R"],
+  "boundaries": [[120, 80], [320, 80], [320, 280], [120, 280]],
+  "confidence": 98,
+  "status": "Good Lighting",
+  "sharpness": 85.0,
+  "preview": "data:image/jpeg;base64,..."
+}
 ```
-Returns 9 colour codes in row-major order (top-left to bottom-right).
-
----
-
-## Algorithm Overview
-
-```
-Phase 1 -> White Cross       (4-6  moves)
-Phase 2 -> White Corners     (3-8  moves)
-Phase 3 -> Second Layer      (6-10 moves)
-Phase 4 -> Yellow Cross      (4-7  moves)
-Phase 5 -> Orient Corners    (4-8  moves)
-Phase 6 -> Permute Corners   (4-8  moves)
-Phase 7 -> Permute Edges     (4-8  moves) -> SOLVED
-```
-
-Cube colour detection uses **Euclidean distance in RGB space** — each pixel cluster is matched to the nearest of the 6 standard cube colours via `color_detect.py`.
 
 ---
 
 ## How to Use
 
-### Method A — Camera
+### Method A — Camera Scanner
 1. Open **http://localhost:5000**
-2. Click **Start Camera** and allow access
-3. Hold each face within the guide box and click **Capture Face**
-4. Repeat for all 6 faces, then click **Generate Solution**
-5. Step through moves with **Next**
+2. Click **Start Camera** and grant camera permissions.
+3. Align the Rubik's Cube face in the center guide box.
+4. When aligned properly, the live tracker will draw boundaries and display colors.
+5. Hold the cube stable for **1 second**; the scanner will play a camera flash and auto-capture the face.
+6. Rotate the cube to the next unscanned face and repeat for all 6 faces.
+7. Click **Generate Solution** to calculate the metrics.
 
 ### Method B — Manual Paint
-1. Select a colour from the swatches
-2. Click stickers on the Face Grid to paint
-3. Click **Save Face**, repeat for all 6 faces, then click **Generate Solution**
+1. Select a color from the swatches.
+2. Click stickers on the Face Grid to paint.
+3. Click **Save Face**, repeat for all 6 faces, then click **Generate Solution**.
 
 ### Method C — Demo
 Click **Demo** to load a pre-scrambled cube instantly.
-
----
-
-## Colour Keys
-
-| Key | Colour | Face |
-|---|---|---|
-| `W` | White | Top (U) |
-| `Y` | Yellow | Bottom (D) |
-| `R` | Red | Front (F) |
-| `O` | Orange | Back (B) |
-| `G` | Green | Left (L) |
-| `B` | Blue | Right (R) |
 
 ---
 
@@ -198,29 +188,11 @@ Click **Demo** to load a pre-scrambled cube instantly.
 
 | Layer | Technology |
 |---|---|
-| Backend | Python 3, Flask, Flask-CORS, Pillow |
-| Frontend | HTML5, CSS3 (Grid, 3D transforms, animations), Vanilla JS (ES Modules) |
-| Camera | Web `getUserMedia` API + `<canvas>` pixel sampling |
+| Backend | Python 3, Flask, Flask-CORS, OpenCV (`opencv-python`), Numpy |
+| Solving Engine | Herbert Kociemba's Two-Phase Algorithm (`pykociemba` with pre-compiled lookup tables) |
+| Frontend | HTML5, CSS3 (3D transforms, custom styling overlays), Vanilla JS (ES Modules) |
+| Camera | Web `getUserMedia` API + `<canvas>` boundary rendering |
 | Fonts | Google Fonts — Inter + Space Grotesk |
-| Build | None — zero bundler, zero npm |
-
----
-
-## Contributing
-
-Ideas for improvement:
-- [ ] Implement Kociemba's algorithm (true optimal solver)
-- [ ] Animated 3D cube that plays back each move
-- [ ] HSV / Lab colour space for better camera detection
-- [ ] Timer + solve history tracking
-- [ ] PWA / offline support
-
-```bash
-git checkout -b feature/your-feature
-git commit -m "Add your feature"
-git push origin feature/your-feature
-# Open a Pull Request
-```
 
 ---
 
