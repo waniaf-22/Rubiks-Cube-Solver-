@@ -11,6 +11,9 @@
 
   <!-- Styles -->
   <link rel="stylesheet" href="/css/style.css">
+  
+  <!-- Canvas Confetti -->
+  <script src="https://cdn.jsdelivr.net/npm/canvas-confetti@1.6.0/dist/confetti.browser.min.js"></script>
 </head>
 <body>
 
@@ -232,7 +235,7 @@
             <div class="cube-net-title">Cube State</div>
             <button class="ibtn ibtn-ghost ibtn-xs" onclick="window.__resetAll()">Reset</button>
           </div>
-          <div class="net-grid" id="netGrid"></div>
+          <div id="cube3dContainer" style="width:100%;height:270px;background:#0e0e12;border-radius:var(--radius-sm);overflow:hidden;border:1px solid var(--border);position:relative"></div>
           <button class="ibtn ibtn-blue"
                   style="width:100%;margin-top:1rem;padding:0.6rem"
                   onclick="window.__generateSolution()">
@@ -315,10 +318,27 @@
               <div class="progress-bar" id="pBar" style="width:0%"></div>
             </div>
           </div>
-          <div class="step-nav">
-            <button class="ibtn ibtn-ghost" onclick="window.__prevStep()">← Prev</button>
-            <button class="ibtn ibtn-blue"  onclick="window.__nextStep()">Next →</button>
+          
+          <div class="playback-notation-row" style="font-family:'Space Grotesk',sans-serif;font-size:0.9rem;font-weight:700;color:var(--blue-bright);text-align:center;padding:0.25rem 0">
+            Current Move: <span id="currentMoveNotation" style="color:var(--white);background:rgba(255,255,255,0.05);padding:2px 8px;border-radius:4px;font-family:monospace;font-size:1rem">—</span>
           </div>
+
+          <div class="step-nav" style="display:flex;gap:0.4rem;flex-wrap:wrap">
+            <button class="ibtn ibtn-ghost" style="flex:1" onclick="window.__prevStep()">⏮ Prev</button>
+            <button class="ibtn ibtn-blue"  style="flex:1.2" id="btnPlay" onclick="window.__playSolution()">▶ Play</button>
+            <button class="ibtn ibtn-ghost" style="flex:1.2;display:none" id="btnPause" onclick="window.__pauseSolution()">⏸ Pause</button>
+            <button class="ibtn ibtn-ghost" style="flex:1" onclick="window.__nextStep()">Next ⏭</button>
+            <button class="ibtn ibtn-ghost" style="padding:0.5rem" title="Restart Solution" onclick="window.__restartSolution()">↺</button>
+          </div>
+
+          <div class="speed-control-row" style="display:flex;justify-content:space-between;align-items:center;font-size:0.75rem;color:var(--white-50);padding:0.25rem 0.5rem">
+            <span>Animation Speed:</span>
+            <div style="display:flex;align-items:center;gap:0.5rem">
+              <input type="range" id="speedSlider" min="150" max="1000" value="300" step="50" style="width:80px;accent-color:var(--blue)" oninput="document.getElementById('speedVal').textContent = this.value">
+              <span><span id="speedVal">300</span>ms</span>
+            </div>
+          </div>
+
           <div class="sol-steps" id="solSteps"></div>
         </div>
 

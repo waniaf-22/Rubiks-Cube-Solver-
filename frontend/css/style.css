@@ -759,4 +759,31 @@ footer {
   scrollbar-color: var(--border) transparent;
 }
 
+/* ── 3D CUBE SIMULATOR LAYOUT ── */
+#cube3dContainer canvas {
+  width: 100% !important;
+  height: 100% !important;
+  display: block;
+}
+.playback-notation-row {
+  margin: 0.5rem 0;
+  border-top: 1px solid var(--border);
+  border-bottom: 1px solid var(--border);
+  padding: 0.5rem 0;
+}
+.speed-control-row input[type="range"] {
+  height: 4px;
+  border-radius: 2px;
+  outline: none;
+  background: var(--border);
+  cursor: pointer;
+}
+.step-nav button {
+  transition: all 0.2s ease;
+}
+.step-nav button:hover {
+  transform: translateY(-1px);
+}
+
+
 
